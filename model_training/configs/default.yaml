@@ -1,0 +1,35 @@
+# ==============================================================================
+# VOICEGUARD AI — MODEL TRAINING CONFIGURATION
+# Supports ASVspoof 2019/2021 and IndicVoices dataset conventions
+# ==============================================================================
+
+model:
+  architecture: "AASIST"
+  sample_rate: 16000
+  n_fft: 512
+  hop_length: 256
+  n_mels: 80
+  n_classes: 2  # 0: Spoof / Synthetic, 1: Bonafide / Genuine
+  embedding_dim: 128
+
+training:
+  batch_size: 32
+  num_epochs: 50
+  learning_rate: 0.0001
+  weight_decay: 0.00001
+  optimizer: "AdamW"
+  scheduler: "CosineAnnealingLR"
+  early_stopping_patience: 7
+  device: "cuda"  # Falls back to "cpu" if CUDA unavailable
+  seed: 42
+
+dataset:
+  train_protocols_file: "datasets/protocols/train.txt"
+  dev_protocols_file: "datasets/protocols/dev.txt"
+  eval_protocols_file: "datasets/protocols/eval.txt"
+  audio_dir: "datasets/wav"
+  max_audio_duration_seconds: 4.0
+
+evaluation:
+  target_eer_threshold: 0.03
+  output_dir: "checkpoints/eval_results"

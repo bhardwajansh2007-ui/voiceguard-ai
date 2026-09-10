@@ -1,0 +1,51 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#07090e" />
+      <stop offset="50%" stop-color="#0b111e" />
+      <stop offset="100%" stop-color="#07090e" />
+    </linearGradient>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="50%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="cyanAccent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#22d3ee" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Dark Background with Rounded Squircle -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+  <rect width="504" height="504" x="4" y="4" rx="108" fill="none" stroke="#06b6d4" stroke-width="3" stroke-opacity="0.3" />
+
+  <!-- Shield Base with Glow -->
+  <g filter="url(#glow)">
+    <path d="M256 70 L390 120 C390 260 256 380 256 420 C256 380 122 260 122 120 Z"
+          fill="url(#shieldGrad)" fill-opacity="0.25"
+          stroke="url(#cyanAccent)" stroke-width="12" stroke-linejoin="round" />
+  </g>
+
+  <!-- Inner Cyber Voice Waves -->
+  <g fill="none" stroke="#22d3ee" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Center Wave Bars -->
+    <line x1="256" y1="180" x2="256" y2="300" stroke-width="14" stroke="#38bdf8" />
+    <line x1="226" y1="205" x2="226" y2="275" stroke-width="12" stroke="#22d3ee" />
+    <line x1="286" y1="205" x2="286" y2="275" stroke-width="12" stroke="#22d3ee" />
+    <line x1="196" y1="225" x2="196" y2="255" stroke-width="10" stroke="#06b6d4" />
+    <line x1="316" y1="225" x2="316" y2="255" stroke-width="10" stroke="#06b6d4" />
+    <line x1="166" y1="235" x2="166" y2="245" stroke-width="8" stroke="#0284c7" />
+    <line x1="346" y1="235" x2="346" y2="245" stroke-width="8" stroke="#0284c7" />
+  </g>
+
+  <!-- Node Accent Dots -->
+  <circle cx="256" cy="180" r="7" fill="#67e8f9" />
+  <circle cx="256" cy="300" r="7" fill="#67e8f9" />
+  <circle cx="226" cy="205" r="6" fill="#67e8f9" />
+  <circle cx="286" cy="205" r="6" fill="#67e8f9" />
+</svg>

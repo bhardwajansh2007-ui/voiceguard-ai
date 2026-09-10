@@ -1,0 +1,49 @@
+﻿{
+  "name": "VoiceGuard AI — Voice Defense",
+  "short_name": "VoiceGuard",
+  "description": "Real-Time Voice Integrity & Impersonation Defense Platform",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#07090e",
+  "theme_color": "#07090e",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["security", "utilities", "business"],
+  "shortcuts": [
+    {
+      "name": "Live Protection",
+      "short_name": "Defense",
+      "description": "Open Live Protection Console",
+      "url": "/?tab=live-protection",
+      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Caller Terminal",
+      "short_name": "Terminal",
+      "description": "Open Mobile Caller Ingestion Terminal",
+      "url": "/?mode=caller",
+      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Communication Sandbox",
+      "short_name": "Sandbox",
+      "description": "Open Integration Simulator",
+      "url": "/?tab=sandbox",
+      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+    }
+  ]
+}

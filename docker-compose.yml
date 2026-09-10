@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: voiceguard_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-voiceguard_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-voiceguard_secret_pwd}
+      POSTGRES_DB: ${POSTGRES_DB:-voiceguard_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voiceguard_user -d voiceguard_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile.backend
+    container_name: voiceguard_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://voiceguard_user:voiceguard_secret_pwd@db:5432/voiceguard_db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./checkpoints:/app/checkpoints
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile.frontend
+    container_name: voiceguard_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
