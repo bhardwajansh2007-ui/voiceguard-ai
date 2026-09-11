@@ -425,3 +425,33 @@ async def analyze_audio_upload(
             "required_action": required_action,
         },
     }
+
+
+@router.post("/{call_id}/end")
+def end_call_session(
+    call_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Marks a call session as completed and records audit ledger seal."""
+    call = db.query(CallSession).filter(CallSession.call_id == call_id).first()
+    if not call:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Call session {call_id} not found.",
+        )
+
+    call.status = "COMPLETED"
+    call.ended_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(call)
+
+    audit_ledger.record_event(
+        db=db,
+        event_type="CALL_COMPLETED",
+        payload={"call_id": call_id, "status": "COMPLETED"},
+        call_id=call.id,
+        actor=current_user.get("sub", "SYSTEM"),
+    )
+
+    return {"status": "COMPLETED", "call_id": call_id}

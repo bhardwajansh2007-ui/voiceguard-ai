@@ -109,6 +109,13 @@ export const api = {
       });
       return handleResponse<any>(res);
     },
+    end: async (callId: string): Promise<any> => {
+      const res = await fetch(`${API_BASE}/calls/${callId}/end`, {
+        method: 'POST',
+        headers: getHeaders(),
+      });
+      return handleResponse<any>(res);
+    },
   },
 
   speakers: {

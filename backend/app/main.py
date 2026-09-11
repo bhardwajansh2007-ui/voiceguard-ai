@@ -81,6 +81,7 @@ app.include_router(security.router, prefix=settings.API_V1_PREFIX)
 app.include_router(audit.router, prefix=settings.API_V1_PREFIX)
 app.include_router(health.router, prefix=settings.API_V1_PREFIX)
 app.include_router(models_status.router, prefix=settings.API_V1_PREFIX)
+app.include_router(models_status.router, prefix="/api")
 app.include_router(integration.router, prefix=settings.API_V1_PREFIX)
 
 # Register WebSocket Routers
