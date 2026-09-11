@@ -50,6 +50,7 @@ import {
 } from '../types';
 
 interface ProtectedPhoneProps {
+  initialScenario?: DemoScenario;
   onNavigateToAuditLedger?: () => void;
   onNavigateToControlCenter?: (tab?: string) => void;
 }
@@ -63,12 +64,13 @@ export type CallStage =
 export type DemoScenario = 'LEGITIMATE' | 'CLONED_IMPERSONATION' | 'UNKNOWN_CALLER';
 
 export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
+  initialScenario = 'CLONED_IMPERSONATION',
   onNavigateToAuditLedger,
   onNavigateToControlCenter,
 }) => {
   // Call Lifecycle on the device (Starts naturally with an incoming call)
   const [callStage, setCallStage] = useState<CallStage>('INCOMING');
-  const [activeScenario, setActiveScenario] = useState<DemoScenario>('CLONED_IMPERSONATION');
+  const [activeScenario, setActiveScenario] = useState<DemoScenario>(initialScenario);
 
   // Caller Information (Existing Phone Environment)
   const [callerName, setCallerName] = useState('Aarav Mehta');
@@ -211,6 +213,12 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
 
     setCallStage('INCOMING');
   };
+
+  useEffect(() => {
+    if (initialScenario) {
+      handleSelectScenario(initialScenario);
+    }
+  }, [initialScenario]);
 
   // Answer Incoming Call -> Normal In-Call begins, VoiceGuard Overlay analyzes audio
   const handleAnswerCall = async () => {

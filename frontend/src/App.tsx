@@ -19,6 +19,7 @@ import { SystemHealth } from './pages/SystemHealth';
 import { Settings } from './pages/Settings';
 import { RemoteCallerTerminal } from './pages/RemoteCallerTerminal';
 import { ProtectedPhone } from './pages/ProtectedPhone';
+import { ControlledSecurityTest } from './pages/ControlledSecurityTest';
 import { MobileNav } from './components/MobileNav';
 import { InstallAppPrompt } from './components/InstallAppPrompt';
 
@@ -27,6 +28,7 @@ export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [currentTab, setCurrentTab] = useState<string>('protected-phone');
+  const [phoneScenario, setPhoneScenario] = useState<'LEGITIMATE' | 'CLONED_IMPERSONATION' | 'UNKNOWN_CALLER'>('CLONED_IMPERSONATION');
   const [targetCallId, setTargetCallId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -108,6 +110,7 @@ export function App() {
         {/* Dedicated Phone Environment Canvas */}
         <main className="flex-1 flex items-center justify-center p-2 sm:p-4 overflow-y-auto bg-grid-pattern">
           <ProtectedPhone
+            initialScenario={phoneScenario}
             onNavigateToAuditLedger={() => setCurrentTab('audit-ledger')}
             onNavigateToControlCenter={(tab) => setCurrentTab(tab || 'overview')}
           />
@@ -144,6 +147,19 @@ export function App() {
                 onNavigateToSpeakers={() => setCurrentTab('identity-registry')}
                 onNavigateToAudit={() => setCurrentTab('audit-ledger')}
                 onNavigateToDecisions={() => setCurrentTab('security-actions')}
+                onNavigateToTest={() => setCurrentTab('controlled-test')}
+              />
+            )}
+
+            {/* Controlled Security Test Lab */}
+            {currentTab === 'controlled-test' && (
+              <ControlledSecurityTest
+                onNavigateToMobileLayer={(scenario) => {
+                  setPhoneScenario(scenario);
+                  setCurrentTab('protected-phone');
+                }}
+                onNavigateToAuditLedger={() => setCurrentTab('audit-ledger')}
+                onNavigateToControlCenter={(tab) => setCurrentTab(tab || 'overview')}
               />
             )}
 

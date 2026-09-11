@@ -12,6 +12,7 @@ import {
   Cpu,
   Network,
   Sliders,
+  TestTube,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -27,6 +28,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
 
   const controlCenterItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'controlled-test', label: 'Controlled Security Test', icon: TestTube, badge: 'TEST LAB' },
     { id: 'caller-intelligence', label: 'Caller Intelligence', icon: UserCheck },
     { id: 'protected-calls', label: 'Protected Calls', icon: ShieldCheck },
     { id: 'identity-registry', label: 'Identity Registry', icon: Users },

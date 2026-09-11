@@ -9,6 +9,7 @@ import {
   Shield,
   Activity,
   Terminal,
+  TestTube,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { CallSession, SystemHealth, SecurityDecisionData } from '../types';
@@ -22,6 +23,7 @@ interface SecurityOverviewProps {
   onNavigateToSpeakers: () => void;
   onNavigateToAudit: () => void;
   onNavigateToDecisions: () => void;
+  onNavigateToTest?: () => void;
 }
 
 export const SecurityOverview: React.FC<SecurityOverviewProps> = ({
@@ -30,6 +32,7 @@ export const SecurityOverview: React.FC<SecurityOverviewProps> = ({
   onNavigateToSpeakers,
   onNavigateToAudit,
   onNavigateToDecisions,
+  onNavigateToTest,
 }) => {
   const [calls, setCalls] = useState<CallSession[]>([]);
   const [decisions, setDecisions] = useState<SecurityDecisionData[]>([]);
@@ -107,6 +110,15 @@ export const SecurityOverview: React.FC<SecurityOverviewProps> = ({
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
           </button>
+          {onNavigateToTest && (
+            <button
+              onClick={onNavigateToTest}
+              className="flex items-center gap-1.5 px-3 py-2 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 font-semibold text-xs font-mono uppercase rounded-lg border border-cyan-500/40 transition cursor-pointer shadow-sm shadow-cyan-500/20"
+            >
+              <TestTube className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Controlled Test Suite</span>
+            </button>
+          )}
           <button
             onClick={() => onNavigateToSandbox()}
             className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-semibold text-xs font-mono uppercase rounded-lg border border-slate-700 transition cursor-pointer"
