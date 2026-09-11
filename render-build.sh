@@ -12,7 +12,7 @@ cd ..
 
 echo ">>> [2/3] Installing CPU-optimized PyTorch..."
 pip install --upgrade pip
-pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 echo ">>> [3/3] Installing Backend Python Requirements..."
 pip install -r backend/requirements.txt

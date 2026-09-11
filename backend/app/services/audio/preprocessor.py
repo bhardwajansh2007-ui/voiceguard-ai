@@ -2,7 +2,6 @@ import io
 import wave
 import numpy as np
 import torch
-import torchaudio.functional as F
 from typing import Tuple, Optional
 from fastapi import HTTPException, status
 from backend.app.core.config import settings
@@ -79,9 +78,19 @@ class AudioPreprocessor:
 
         # 4. Resample to TARGET_SAMPLE_RATE if needed
         if orig_sr != cls.TARGET_SAMPLE_RATE:
-            tensor_audio = torch.from_numpy(audio)
-            resampled = F.resample(tensor_audio, orig_sr, cls.TARGET_SAMPLE_RATE)
-            audio = resampled.numpy().astype(np.float32)
+            try:
+                import torchaudio.functional as F
+                tensor_audio = torch.from_numpy(audio)
+                resampled = F.resample(tensor_audio, orig_sr, cls.TARGET_SAMPLE_RATE)
+                audio = resampled.numpy().astype(np.float32)
+            except Exception:
+                target_length = int(len(audio) * cls.TARGET_SAMPLE_RATE / orig_sr)
+                try:
+                    from scipy import signal
+                    audio = signal.resample(audio, target_length).astype(np.float32)
+                except Exception:
+                    indices = np.linspace(0, len(audio) - 1, target_length)
+                    audio = np.interp(indices, np.arange(len(audio)), audio).astype(np.float32)
 
         # 5. Amplitude normalization (peak scale if audio is non-silent)
         peak = np.max(np.abs(audio))
