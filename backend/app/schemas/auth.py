@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class Token(BaseModel):
@@ -20,7 +20,7 @@ class TokenPayload(BaseModel):
 
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
-    email: EmailStr
+    email: str = Field(..., min_length=5, max_length=128)
     password: str = Field(..., min_length=8, max_length=128)
     role: str = Field(default="SECURITY_ANALYST")
 

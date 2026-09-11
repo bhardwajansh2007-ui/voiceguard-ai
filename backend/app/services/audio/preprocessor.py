@@ -1,9 +1,8 @@
 import io
 import wave
 import numpy as np
-from scipy.io import wavfile
-from scipy.signal import resample_poly
-from math import gcd
+import torch
+import torchaudio.functional as F
 from typing import Tuple, Optional
 from fastapi import HTTPException, status
 from backend.app.core.config import settings
@@ -22,37 +21,32 @@ class AudioPreprocessor:
     def load_wav_bytes(cls, audio_bytes: bytes) -> Tuple[np.ndarray, int]:
         """Loads and parses WAV audio bytes safely into a numpy array."""
         try:
-            sample_rate, data = wavfile.read(io.BytesIO(audio_bytes))
-            return data, sample_rate
+            with wave.open(io.BytesIO(audio_bytes), "rb") as wf:
+                n_channels = wf.getnchannels()
+                sampwidth = wf.getsampwidth()
+                framerate = wf.getframerate()
+                n_frames = wf.getnframes()
+                raw_data = wf.readframes(n_frames)
+
+                if sampwidth == 1:
+                    dtype = np.uint8
+                elif sampwidth == 2:
+                    dtype = np.int16
+                elif sampwidth == 4:
+                    dtype = np.int32
+                else:
+                    raise ValueError(f"Unsupported sample width: {sampwidth}")
+
+                audio_arr = np.frombuffer(raw_data, dtype=dtype)
+                if n_channels > 1:
+                    audio_arr = audio_arr.reshape(-1, n_channels)
+                return audio_arr, framerate
         except Exception as e:
-            # Fallback to standard library wave module
-            try:
-                with wave.open(io.BytesIO(audio_bytes), "rb") as wf:
-                    n_channels = wf.getnchannels()
-                    sampwidth = wf.getsampwidth()
-                    framerate = wf.getframerate()
-                    n_frames = wf.getnframes()
-                    raw_data = wf.readframes(n_frames)
-
-                    if sampwidth == 1:
-                        dtype = np.uint8
-                    elif sampwidth == 2:
-                        dtype = np.int16
-                    elif sampwidth == 4:
-                        dtype = np.int32
-                    else:
-                        raise ValueError(f"Unsupported sample width: {sampwidth}")
-
-                    audio_arr = np.frombuffer(raw_data, dtype=dtype)
-                    if n_channels > 1:
-                        audio_arr = audio_arr.reshape(-1, n_channels)
-                    return audio_arr, framerate
-            except Exception as inner_e:
-                logger.error(f"Failed to decode audio: {str(e)} / {str(inner_e)}")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Unable to decode audio stream: Corrupted or unreadable format."
-                )
+            logger.error(f"Failed to decode audio: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unable to decode audio stream: Corrupted or unreadable format."
+            )
 
     @classmethod
     def normalize_audio(cls, audio_data: np.ndarray, orig_sr: int) -> Tuple[np.ndarray, float]:
@@ -85,10 +79,9 @@ class AudioPreprocessor:
 
         # 4. Resample to TARGET_SAMPLE_RATE if needed
         if orig_sr != cls.TARGET_SAMPLE_RATE:
-            factor_gcd = gcd(orig_sr, cls.TARGET_SAMPLE_RATE)
-            up = cls.TARGET_SAMPLE_RATE // factor_gcd
-            down = orig_sr // factor_gcd
-            audio = resample_poly(audio, up, down).astype(np.float32)
+            tensor_audio = torch.from_numpy(audio)
+            resampled = F.resample(tensor_audio, orig_sr, cls.TARGET_SAMPLE_RATE)
+            audio = resampled.numpy().astype(np.float32)
 
         # 5. Amplitude normalization (peak scale if audio is non-silent)
         peak = np.max(np.abs(audio))

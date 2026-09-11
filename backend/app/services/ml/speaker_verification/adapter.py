@@ -2,12 +2,25 @@ import os
 import time
 from typing import Dict, Any, List, Optional
 import numpy as np
-from scipy.fft import rfft, dct
-from scipy.spatial.distance import cosine
 
 from backend.app.services.ml.speaker_verification.base import BaseSpeakerVerificationModel
 from backend.app.core.config import settings
 from backend.app.core.logging import logger
+
+
+def _dct_type2(x: np.ndarray, n: int = 64) -> np.ndarray:
+    """Discrete Cosine Transform (Type-II) with orthonormal scaling."""
+    N = len(x)
+    k = np.arange(min(n, N))
+    indices = np.arange(N)
+    basis = np.cos(np.pi * (2 * indices + 1)[:, None] * k / (2.0 * N))
+    res = np.dot(x, basis)
+    res[0] *= np.sqrt(1.0 / (4.0 * N)) * 2
+    if len(res) > 1:
+        res[1:] *= np.sqrt(1.0 / (2.0 * N)) * 2
+    if len(res) < n:
+        res = np.pad(res, (0, n - len(res)))
+    return res[:n]
 
 
 class SpeakerVerificationAdapter(BaseSpeakerVerificationModel):
@@ -61,12 +74,12 @@ class SpeakerVerificationAdapter(BaseSpeakerVerificationModel):
             frame = audio[i * hop : i * hop + n_fft]
             if len(frame) < n_fft:
                 frame = np.pad(frame, (0, n_fft - len(frame)))
-            fft_mags.append(np.abs(rfft(frame * window)))
+            fft_mags.append(np.abs(np.fft.rfft(frame * window)))
 
         avg_mag = np.mean(fft_mags, axis=0) if fft_mags else np.zeros(n_fft // 2 + 1)
         
         # 2. Extract DCT features (64 coefficients)
-        dct_coeffs = dct(np.log1p(avg_mag), type=2, norm="ortho")[:64]
+        dct_coeffs = _dct_type2(np.log1p(avg_mag), n=64)
 
         # 3. Statistical temporal moments across frames (variance, skew across time: 32 values)
         if len(fft_mags) > 1:

@@ -1,8 +1,21 @@
 import numpy as np
-from scipy.fft import rfft, rfftfreq, dct
-from scipy.signal import find_peaks
 from typing import Dict, Any, List
 from backend.app.schemas.analysis import AcousticFeatures
+
+
+def _dct_type2(x: np.ndarray, n: int = 13) -> np.ndarray:
+    """Discrete Cosine Transform (Type-II) with orthonormal scaling."""
+    N = len(x)
+    k = np.arange(min(n, N))
+    indices = np.arange(N)
+    basis = np.cos(np.pi * (2 * indices + 1)[:, None] * k / (2.0 * N))
+    res = np.dot(x, basis)
+    res[0] *= np.sqrt(1.0 / (4.0 * N)) * 2
+    if len(res) > 1:
+        res[1:] *= np.sqrt(1.0 / (2.0 * N)) * 2
+    if len(res) < n:
+        res = np.pad(res, (0, n - len(res)))
+    return res[:n]
 
 
 class AcousticFeatureExtractor:
@@ -63,7 +76,7 @@ class AcousticFeatureExtractor:
         # 3. Spectral magnitude using Short-Time FFT
         num_frames = max(1, 1 + int((len(audio) - self.n_fft) / self.hop_length))
         window = np.hanning(self.n_fft)
-        freqs = rfftfreq(self.n_fft, 1.0 / self.sample_rate)
+        freqs = np.fft.rfftfreq(self.n_fft, 1.0 / self.sample_rate)
         
         magnitudes = []
         centroids = []
@@ -78,7 +91,7 @@ class AcousticFeatureExtractor:
                 frame = np.pad(frame, (0, self.n_fft - len(frame)))
 
             windowed = frame * window
-            mag = np.abs(rfft(windowed))
+            mag = np.abs(np.fft.rfft(windowed))
             magnitudes.append(mag)
 
             mag_sum = np.sum(mag)
@@ -106,7 +119,7 @@ class AcousticFeatureExtractor:
         mean_mag = np.mean(magnitudes, axis=0) if magnitudes else np.zeros(self.n_fft // 2 + 1)
         mel_energies = np.dot(fb, mean_mag)
         log_mel = np.log(np.maximum(mel_energies, 1e-10))
-        mfccs = dct(log_mel, type=2, norm="ortho")[:self.n_mfcc]
+        mfccs = _dct_type2(log_mel, n=self.n_mfcc)
         mfcc_list = [float(x) for x in mfccs]
 
         # 5. Fundamental Frequency (F0 Pitch) via Autocorrelation

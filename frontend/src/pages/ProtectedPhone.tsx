@@ -41,6 +41,7 @@ import { api } from '../services/api';
 import { VoiceStreamClient } from '../services/websocket';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { WaveformVisualizer } from '../components/WaveformVisualizer';
+import { AudioFileStreamer } from '../utils/audioStreamer';
 import {
   CallSession,
   CallDetailResponse,
@@ -95,10 +96,10 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
   const [streamError, setStreamError] = useState<string | null>(null);
 
   // Dynamic Security Evaluation
-  const [currentRiskScore, setCurrentRiskScore] = useState<number>(14);
-  const [speakerSimilarityScore, setSpeakerSimilarityScore] = useState<number>(94);
-  const [voiceAuthenticityScore, setVoiceAuthenticityScore] = useState<number>(91);
-  const [maxObservedRisk, setMaxObservedRisk] = useState<number>(14);
+  const [currentRiskScore, setCurrentRiskScore] = useState<number>(0);
+  const [speakerSimilarityScore, setSpeakerSimilarityScore] = useState<number>(0);
+  const [voiceAuthenticityScore, setVoiceAuthenticityScore] = useState<number>(0);
+  const [maxObservedRisk, setMaxObservedRisk] = useState<number>(0);
   const [isAnomalyDetected, setIsAnomalyDetected] = useState(false);
   const [isImpersonationDetected, setIsImpersonationDetected] = useState(false);
   const [isSensitiveActionTriggered, setIsSensitiveActionTriggered] = useState(false);
@@ -111,6 +112,7 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
 
   // Audio Streaming Client
   const streamClientRef = useRef<VoiceStreamClient | null>(null);
+  const fileStreamerRef = useRef<AudioFileStreamer>(new AudioFileStreamer());
   const handleAudioChunk = useCallback((chunk: Int16Array) => {
     if (streamClientRef.current) {
       streamClientRef.current.sendAudioChunk(chunk);
@@ -182,10 +184,10 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
       setCallerHandle('EMP-DEMO-001');
       setCallerNumber('+91 98000 12345');
       setIsEnrolledCaller(true);
-      setCurrentRiskScore(12);
-      setSpeakerSimilarityScore(94);
-      setVoiceAuthenticityScore(96);
-      setMaxObservedRisk(12);
+      setCurrentRiskScore(0);
+      setSpeakerSimilarityScore(0);
+      setVoiceAuthenticityScore(0);
+      setMaxObservedRisk(0);
     } else if (scenario === 'CLONED_IMPERSONATION') {
       setCallerName('Aarav Mehta');
       setCallerOrg('DemoBank Secure');
@@ -193,10 +195,10 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
       setCallerHandle('EMP-DEMO-001');
       setCallerNumber('+91 98000 12345');
       setIsEnrolledCaller(true);
-      setCurrentRiskScore(14);
-      setSpeakerSimilarityScore(94);
-      setVoiceAuthenticityScore(91);
-      setMaxObservedRisk(14);
+      setCurrentRiskScore(0);
+      setSpeakerSimilarityScore(0);
+      setVoiceAuthenticityScore(0);
+      setMaxObservedRisk(0);
     } else {
       // Unknown Caller
       setCallerName('Unknown Caller');
@@ -205,10 +207,10 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
       setCallerHandle('UNVERIFIED');
       setCallerNumber('+91 91234 56789');
       setIsEnrolledCaller(false);
-      setCurrentRiskScore(28);
+      setCurrentRiskScore(0);
       setSpeakerSimilarityScore(0);
       setVoiceAuthenticityScore(0);
-      setMaxObservedRisk(28);
+      setMaxObservedRisk(0);
     }
 
     setCallStage('INCOMING');
@@ -246,12 +248,65 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
         sessionCallId,
         (update) => {
           setLiveAnalysis(update);
-          if (update.overall_risk_score) {
-            setCurrentRiskScore(Math.round(update.overall_risk_score));
+          if (update.overall_risk_score !== undefined && update.overall_risk_score !== null) {
+            const risk = Math.round(update.overall_risk_score);
+            setCurrentRiskScore(risk);
+            setMaxObservedRisk((prev) => Math.max(prev, risk));
+          }
+          if (
+            update.voice_authenticity &&
+            update.voice_authenticity.genuine_probability !== undefined &&
+            update.voice_authenticity.genuine_probability !== null
+          ) {
+            const authScore = Math.round(update.voice_authenticity.genuine_probability * 100);
+            setVoiceAuthenticityScore(authScore);
+            if (update.voice_authenticity.status === 'SPOOF') {
+              setIsAnomalyDetected(true);
+            }
+          }
+          if (
+            update.speaker_verification &&
+            update.speaker_verification.similarity !== undefined &&
+            update.speaker_verification.similarity !== null
+          ) {
+            setSpeakerSimilarityScore(Math.round(update.speaker_verification.similarity * 100));
+          }
+          // Voice Impersonation Attack Rule: High speaker match (>70%) + low voice authenticity (<40% or status SPOOF)
+          if (
+            update.overall_risk_score >= 65 ||
+            (update.voice_authenticity?.status === 'SPOOF' &&
+              update.speaker_verification &&
+              (update.speaker_verification.similarity ?? 0) >= 0.70)
+          ) {
+            setIsImpersonationDetected(true);
+          }
+          if (
+            update.recommended_action === 'ACTION_HOLD' ||
+            update.required_action === 'HOLD_SENSITIVE_ACTION'
+          ) {
+            setIsActionOnHold(true);
+            setIsSensitiveActionTriggered(true);
           }
         },
         (errMsg) => setStreamError(errMsg),
-        () => startRecording(),
+        () => {
+          // Stream real benchmark audio file over WebSocket at 16kHz playback rate
+          const sampleMap: Record<DemoScenario, string> = {
+            LEGITIMATE: '/samples/legitimate_sample.wav',
+            CLONED_IMPERSONATION: '/samples/synthetic_clone_sample.wav',
+            UNKNOWN_CALLER: '/samples/unknown_sample.wav',
+          };
+          const sampleUrl = sampleMap[activeScenario] || '/samples/legitimate_sample.wav';
+          fileStreamerRef.current.streamWavUrl(
+            sampleUrl,
+            (chunk) => {
+              handleAudioChunk(chunk);
+            },
+            () => {
+              console.log('Finished streaming benchmark audio file for:', activeScenario);
+            }
+          );
+        },
         (buf) => setBufferStatus(buf)
       );
 
@@ -259,44 +314,6 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
       client.connect();
 
       setCallStage('ACTIVE');
-
-      // Controlled Sequence for Cloned Impersonation Demonstration
-      if (activeScenario === 'CLONED_IMPERSONATION') {
-        // After 6s: Acoustic Anomaly detected (State 2: Warning)
-        setTimeout(() => {
-          setCurrentRiskScore(42);
-          setVoiceAuthenticityScore(65);
-          setIsAnomalyDetected(true);
-        }, 6000);
-
-        // After 11s: Synthetic speech detected (State 3: Impersonation Alert)
-        setTimeout(() => {
-          setCurrentRiskScore(82);
-          setVoiceAuthenticityScore(18);
-          setSpeakerSimilarityScore(94);
-          setIsImpersonationDetected(true);
-        }, 11000);
-
-        // After 16s: Caller requests sensitive ₹25,00,000 emergency wire
-        setTimeout(() => {
-          setIsSensitiveActionTriggered(true);
-        }, 16000);
-
-        // After 19s: VoiceGuard Automated Policy executes Action Hold
-        setTimeout(async () => {
-          setIsActionOnHold(true);
-          try {
-            await api.security.simulateSensitiveAction({
-              call_id: sessionCallId,
-              action_type: 'EMERGENCY_WIRE_TRANSFER',
-              action_description: 'Emergency wire transfer of ₹25,00,000',
-              simulated_amount: 2500000,
-            });
-          } catch (e) {
-            console.error('Failed to register action hold:', e);
-          }
-        }, 19000);
-      }
     } catch (err: any) {
       setStreamError(err.message || 'Failed to initialize voice security analysis session');
     }
@@ -331,6 +348,7 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
 
   // Stop Audio Stream
   const handleStopStream = () => {
+    fileStreamerRef.current.stop();
     if (streamClientRef.current) {
       streamClientRef.current.stop();
       streamClientRef.current.disconnect();
@@ -713,7 +731,7 @@ ENTERPRISE SECURITY CONTROL CENTER & SHA-256 AUDIT LEDGER`}
                   <div className="flex justify-between items-center">
                     <span className="text-slate-400">Speaker Match:</span>
                     <span className={`font-bold ${speakerSimilarityScore > 75 ? 'text-cyan-300' : 'text-slate-400'}`}>
-                      {speakerSimilarityScore > 0 ? `${speakerSimilarityScore}%` : 'NOT ENROLLED'}
+                      {speakerSimilarityScore > 0 ? `${speakerSimilarityScore}%` : isEnrolledCaller ? 'ANALYZING...' : 'NOT ENROLLED'}
                     </span>
                   </div>
 
@@ -727,7 +745,7 @@ ENTERPRISE SECURITY CONTROL CENTER & SHA-256 AUDIT LEDGER`}
                   <div className="flex justify-between items-center">
                     <span className="text-slate-400">Risk Assessment:</span>
                     <span className={`font-bold ${isImpersonationDetected ? 'text-rose-400' : isAnomalyDetected ? 'text-amber-400' : 'text-emerald-400'}`}>
-                      {currentRiskScore} / 100
+                      {currentRiskScore > 0 ? `${currentRiskScore} / 100` : 'CALCULATING...'}
                     </span>
                   </div>
                 </div>

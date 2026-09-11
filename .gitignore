@@ -43,6 +43,8 @@ uploads/
 *.mp3
 *.flac
 *.m4a
+!backend/app/data/samples/*.wav
+!frontend/public/samples/*.wav
 
 # Machine learning model checkpoints
 *.pth

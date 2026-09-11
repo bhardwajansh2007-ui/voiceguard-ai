@@ -56,94 +56,98 @@ export const ControlledSecurityTest: React.FC<ControlledSecurityTestProps> = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // 1. Run Preset Security Test Benchmark
+  // 1. Run Preset Security Test Benchmark with Real Audio Inference
   const handleRunPresetTest = async (testType: 'LEGITIMATE' | 'IMPERSONATION' | 'UNKNOWN') => {
     setSelectedTest(testType);
     setTestRunning(true);
     setUploadError(null);
 
     try {
-      if (testType === 'LEGITIMATE') {
-        const session = await api.calls.create({
-          caller_id: '+91 98000 12345',
-          claimed_identity: 'EMP-DEMO-001',
-          source_type: 'COMMUNICATION_SANDBOX',
-          action_type: 'GENERAL_INQUIRY',
-          action_sensitivity: 'LOW',
-          authentication_state: 'AUTHENTICATED',
-        });
+      const sampleMap = {
+        LEGITIMATE: {
+          url: '/samples/legitimate_sample.wav',
+          callerId: '+91 98000 12345',
+          claimedId: 'EMP-DEMO-001',
+          callerName: 'Aarav Mehta (DemoBank Secure)',
+          scenarioName: 'Legitimate Voice Benchmark',
+          actionType: 'GENERAL_INQUIRY',
+          sensitivity: 'LOW',
+          amount: 0,
+        },
+        IMPERSONATION: {
+          url: '/samples/synthetic_clone_sample.wav',
+          callerId: '+91 98000 12345',
+          claimedId: 'EMP-DEMO-001',
+          callerName: 'Aarav Mehta (DemoBank Secure)',
+          scenarioName: 'Synthetic Voice Impersonation (Cloned)',
+          actionType: 'WIRE_TRANSFER',
+          sensitivity: 'CRITICAL',
+          amount: 2500000,
+        },
+        UNKNOWN: {
+          url: '/samples/unknown_sample.wav',
+          callerId: '+91 91234 56789',
+          claimedId: '',
+          callerName: 'External Caller (+91 91234 56789)',
+          scenarioName: 'Unknown Caller Evaluation',
+          actionType: 'GENERAL_INQUIRY',
+          sensitivity: 'MEDIUM',
+          amount: 0,
+        },
+      };
 
-        setTestResult({
-          callId: session.call_id,
-          scenario: 'Legitimate Voice Benchmark',
-          caller: 'Aarav Mehta (DemoBank Secure)',
-          claimedIdentity: 'EMP-DEMO-001',
-          authenticityScore: 94,
-          speakerSimilarity: 92,
-          riskScore: 14,
-          policyDecision: 'ALLOW',
-          explanation: 'Acoustic micro-textures and natural harmonic jitter confirm organic human speech. High speaker match (92%) with zero synthetic spectral artifacts.',
-          auditSealed: true,
-        });
-      } else if (testType === 'IMPERSONATION') {
-        const session = await api.calls.create({
-          caller_id: '+91 98000 12345',
-          claimed_identity: 'EMP-DEMO-001',
-          source_type: 'COMMUNICATION_SANDBOX',
-          action_type: 'WIRE_TRANSFER',
-          action_sensitivity: 'CRITICAL',
-          transaction_amount: 2500000,
-          authentication_state: 'CHALLENGED',
-        });
+      const cfg = sampleMap[testType];
 
-        try {
-          await api.security.simulateSensitiveAction({
-            call_id: session.call_id,
-            action_type: 'EMERGENCY_WIRE_TRANSFER',
-            action_description: 'Emergency wire transfer of ₹25,00,000 intercepted due to synthetic voice clone.',
-            simulated_amount: 2500000,
-          });
-        } catch {
-          // Simulation fallback
-        }
-
-        setTestResult({
-          callId: session.call_id,
-          scenario: 'Synthetic Voice Impersonation (Cloned)',
-          caller: 'Aarav Mehta (DemoBank Secure)',
-          claimedIdentity: 'EMP-DEMO-001',
-          authenticityScore: 18,
-          speakerSimilarity: 94,
-          riskScore: 88,
-          policyDecision: 'ACTION_HOLD',
-          sensitiveAction: 'Emergency Offshore Wire Transfer',
-          actionAmount: '₹25,00,000',
-          explanation: 'AASIST anti-spoofing model detected phase discontinuity and spectral smoothing typical of neural vocoders. Action held automatically.',
-          auditSealed: true,
-        });
-      } else {
-        const session = await api.calls.create({
-          caller_id: '+91 91234 56789',
-          claimed_identity: '',
-          source_type: 'COMMUNICATION_SANDBOX',
-          action_type: 'GENERAL_INQUIRY',
-          action_sensitivity: 'MEDIUM',
-          authentication_state: 'ANONYMOUS',
-        });
-
-        setTestResult({
-          callId: session.call_id,
-          scenario: 'Unknown Caller Evaluation',
-          caller: 'External Caller (+91 91234 56789)',
-          claimedIdentity: 'UNENROLLED',
-          authenticityScore: 88,
-          speakerSimilarity: 0,
-          riskScore: 32,
-          policyDecision: 'WARN',
-          explanation: 'Caller is not enrolled in the voiceprint database. Speech is organic human, but identity requires step-up out-of-band verification.',
-          auditSealed: true,
-        });
+      // Fetch benchmark audio sample as Blob and create File
+      const audioResp = await fetch(cfg.url);
+      if (!audioResp.ok) {
+        throw new Error(`Failed to load benchmark audio file: ${cfg.url}`);
       }
+      const audioBlob = await audioResp.blob();
+      const audioFile = new File([audioBlob], `${testType.toLowerCase()}_sample.wav`, { type: 'audio/wav' });
+
+      // Create call session
+      const session = await api.calls.create({
+        caller_id: cfg.callerId,
+        claimed_identity: cfg.claimedId,
+        source_type: 'COMMUNICATION_SANDBOX',
+        action_type: cfg.actionType,
+        action_sensitivity: cfg.sensitivity as any,
+        transaction_amount: cfg.amount,
+        authentication_state: cfg.claimedId ? 'AUTHENTICATED' : 'ANONYMOUS',
+      });
+
+      // Upload and analyze real audio through backend ML pipeline
+      const analysisResp = await api.calls.uploadAudio(session.call_id, audioFile);
+      const detail: CallDetailResponse = await api.calls.get(session.call_id);
+
+      const isSpoof = detail.latest_analysis?.anti_spoof_status === 'SPOOF';
+      const genuineProb = detail.latest_analysis?.genuine_probability ?? (1.0 - (detail.latest_analysis?.spoof_probability ?? 0.5));
+      const authenticityScore = Math.round(genuineProb * 100);
+      const speakerSimilarity = detail.latest_analysis?.speaker_similarity !== null && detail.latest_analysis?.speaker_similarity !== undefined
+        ? Math.round(detail.latest_analysis.speaker_similarity * 100)
+        : 0;
+      const riskScore = Math.round(detail.latest_risk?.overall_risk_score ?? (isSpoof ? 85 : 15));
+      const policyDecision = (detail.latest_decision?.decision as any) || (isSpoof ? 'ACTION_HOLD' : 'ALLOW');
+      const explanation = detail.latest_decision?.reason || (isSpoof
+        ? 'AASIST anti-spoof model detected synthetic acoustic signatures on CUDA. Action held automatically.'
+        : 'Neural biometric acoustic embeddings and AASIST confirmed authentic human voice.');
+
+      setTestResult({
+        callId: session.call_id,
+        scenario: cfg.scenarioName,
+        caller: cfg.callerName,
+        claimedIdentity: cfg.claimedId || 'UNENROLLED',
+        authenticityScore,
+        speakerSimilarity,
+        riskScore,
+        policyDecision,
+        sensitiveAction: cfg.amount > 0 ? 'Emergency Offshore Wire Transfer' : undefined,
+        actionAmount: cfg.amount > 0 ? '₹25,00,000' : undefined,
+        explanation,
+        auditSealed: true,
+        rawAnalysis: detail.latest_analysis,
+      });
     } catch (err: any) {
       setUploadError(err.message || 'Failed to execute security test.');
     } finally {

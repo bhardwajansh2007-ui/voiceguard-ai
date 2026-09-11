@@ -139,15 +139,28 @@ def init_database() -> None:
             db.add(fictional_identity)
             db.flush()
 
-            # Add reference acoustic embedding (128-dim normalized synthetic unit vector)
-            dummy_emb = [0.0] * 128
-            dummy_emb[0] = 1.0  # Normalized unit vector
+            # Compute reference acoustic embedding from legitimate sample
+            emb_vector = [0.0] * 128
+            emb_duration = 3.5
+            try:
+                import os
+                import soundfile as sf
+                from backend.app.services.ml.speaker_verification.adapter import speaker_verification_adapter
+                sample_path = "backend/app/data/samples/legitimate_sample.wav"
+                if os.path.exists(sample_path):
+                    audio, sr = sf.read(sample_path)
+                    emb_vector = speaker_verification_adapter.compute_embedding(audio, sr)
+                    emb_duration = float(len(audio)) / float(sr)
+            except Exception as emb_e:
+                logger.warning(f"Using default normalized vector for initial enrollment: {str(emb_e)}")
+                emb_vector[0] = 1.0
+
             ref_emb = SpeakerEmbedding(
                 speaker_id=fictional_identity.id,
-                embedding_json=json.dumps(dummy_emb),
-                vector_dim=128,
-                sample_duration_seconds=3.5,
-                model_version="v1.0.0",
+                embedding_json=json.dumps(emb_vector),
+                vector_dim=len(emb_vector),
+                sample_duration_seconds=emb_duration,
+                model_version="AcousticEmbed-v1.0",
             )
             db.add(ref_emb)
 

@@ -56,9 +56,9 @@ class Settings(BaseSettings):
     STREAM_STEP_SIZE_SECONDS: float = 0.5
 
     # Machine Learning Models
-    ANTI_SPOOF_MODEL_PATH: str = ""
+    ANTI_SPOOF_MODEL_PATH: str = "backend/app/services/ml/anti_spoof/checkpoints/AASIST.pth"
     SPEAKER_VERIFICATION_MODEL_PATH: str = ""
-    DEVICE: str = "cpu"  # cpu, cuda, auto
+    DEVICE: str = "auto"  # cpu, cuda, auto
 
     # Risk Thresholds
     RISK_THRESHOLD_LOW: float = 30.0
