@@ -49,9 +49,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Smartphone className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Protected Phone</span>
-            <span className="sm:hidden">Phone</span>
+            <Shield className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Mobile Security Layer</span>
+            <span className="sm:hidden">Security Layer</span>
           </button>
           <button
             onClick={() => onSelectTab(isPhoneMode ? 'overview' : currentTab)}
@@ -62,8 +62,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <LayoutDashboard className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Control Center</span>
-            <span className="sm:hidden">Center</span>
+            <span className="hidden sm:inline">Security Control Center</span>
+            <span className="sm:hidden">Control Center</span>
           </button>
         </div>
       )}

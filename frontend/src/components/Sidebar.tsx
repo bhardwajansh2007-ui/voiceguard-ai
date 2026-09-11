@@ -1,4 +1,5 @@
 import {
+  Shield,
   Smartphone,
   LayoutDashboard,
   UserCheck,
@@ -20,7 +21,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => {
   const phoneItems = [
-    { id: 'protected-phone', label: 'Protected Phone', icon: Smartphone, badge: 'ACTIVE' },
+    { id: 'protected-phone', label: 'Mobile Security Layer', icon: Shield, badge: 'ACTIVE LAYER' },
     { id: 'live-protection', label: 'Live Signal Defense', icon: Activity, badge: 'STREAM' },
   ];
 
@@ -40,11 +41,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
   return (
     <aside className="hidden md:flex w-64 border-r border-slate-800/80 bg-slate-950/60 p-4 flex-col justify-between shrink-0">
       <div className="space-y-5">
-        {/* Group 1: Phone Security Experience */}
+        {/* Group 1: Communication Security Layer */}
         <div>
           <div className="text-[10px] font-mono uppercase tracking-widest text-cyan-400 font-bold px-3 mb-2 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-            <span>PHONE SECURITY</span>
+            <span>SECURITY LAYER INTEGRATION</span>
           </div>
           <nav className="space-y-1">
             {phoneItems.map((item) => {

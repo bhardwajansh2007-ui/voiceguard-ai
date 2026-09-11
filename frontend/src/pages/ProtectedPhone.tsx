@@ -31,6 +31,8 @@ import {
   AlertOctagon,
   Info,
   ExternalLink,
+  Layers,
+  Network,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { VoiceStreamClient } from '../services/websocket';
@@ -49,20 +51,20 @@ interface ProtectedPhoneProps {
   onNavigateToControlCenter?: (tab?: string) => void;
 }
 
-// 12 Coherent States of Phone-First Voice Security Layer
-export type PhoneCallState =
-  | 'IDLE'                         // State 1: Idle / Standby
-  | 'INCOMING_CALL'                // State 2: Incoming Call Screen
-  | 'PRE_CALL_INSPECTION'          // State 3: Pre-Call Trust Inspection
-  | 'ACTIVE_CALL'                  // State 4: Active Call
-  | 'VOICE_ANALYSIS'               // State 5: Real-Time Voice Analysis
-  | 'ELEVATED_RISK'                // State 6: Elevated Risk
-  | 'VOICE_IMPERSONATION_WARNING'  // State 7: Voice Impersonation Warning Overlay
-  | 'SENSITIVE_ACTION_DETECTED'    // State 8: Sensitive Action Detected (₹25L wire)
-  | 'ACTION_HOLD'                  // State 9: Action On Hold
-  | 'STEP_UP_VERIFICATION'         // State 10: Step-Up Verification (MFA / Callback)
-  | 'CALL_ENDED'                   // State 11: Call Ended
-  | 'POST_CALL_REPORT';            // State 12: Post-Call Security Report
+// Security Layer Lifecycle States
+export type SecurityLayerCallState =
+  | 'IDLE'                         // State 1: Idle Communication Environment
+  | 'INCOMING_CALL'                // State 2: Incoming Call ringing on device
+  | 'PRE_CALL_INSPECTION'          // State 3: Pre-Call Trust Inspection overlay
+  | 'ACTIVE_CALL'                  // State 4: Active Communication with Security Layer
+  | 'VOICE_ANALYSIS'               // State 5: Real-Time Voice Analysis Active
+  | 'ELEVATED_RISK'                // State 6: Suspicious Communication (Warning State)
+  | 'VOICE_IMPERSONATION_WARNING'  // State 7: High-Risk Impersonation Overlay
+  | 'SENSITIVE_ACTION_DETECTED'    // State 8: High-Value Request Detected
+  | 'ACTION_HOLD'                  // State 9: Action Hold Enforced
+  | 'STEP_UP_VERIFICATION'         // State 10: Step-Up Identity Challenge
+  | 'CALL_ENDED'                   // State 11: Call Disconnected
+  | 'POST_CALL_REPORT';            // State 12: Post-Communication Security Summary
 
 export type DemoScenario = 'LEGITIMATE' | 'CLONED_IMPERSONATION' | 'UNKNOWN_CALLER';
 
@@ -71,10 +73,10 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
   onNavigateToControlCenter,
 }) => {
   // Primary State Machine
-  const [callState, setCallState] = useState<PhoneCallState>('IDLE');
+  const [callState, setCallState] = useState<SecurityLayerCallState>('IDLE');
   const [activeScenario, setActiveScenario] = useState<DemoScenario>('CLONED_IMPERSONATION');
 
-  // Caller Profile (Fictional Demonstration Identity)
+  // Caller Profile (Controlled Fictional Identity)
   const [callerName, setCallerName] = useState('Aarav Mehta');
   const [callerOrg, setCallerOrg] = useState('DemoBank Secure');
   const [callerRole, setCallerRole] = useState('Finance Operations');
@@ -88,6 +90,7 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
   const [callDurationSec, setCallDurationSec] = useState<number>(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+  const [showArchDetails, setShowArchDetails] = useState(false);
 
   // Real ML Telemetry & Authoritative Model Status
   const [modelHealth, setModelHealth] = useState<ModelHealth | null>(null);
@@ -129,7 +132,7 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
     onAudioChunk: handleAudioChunk,
   });
 
-  // Load Authoritative Model Status from Single Backend Source
+  // Query Authoritative Model Health from Single Backend Source
   useEffect(() => {
     const fetchModelStatus = async () => {
       try {
@@ -165,7 +168,7 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
     return () => clearInterval(interval);
   }, [callState]);
 
-  // Track Maximum Observed Risk
+  // Track Peak Observed Risk
   useEffect(() => {
     if (currentRiskScore > maxObservedRisk) {
       setMaxObservedRisk(currentRiskScore);
@@ -211,22 +214,21 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
     } else {
       // Scenario: Unknown Caller
       setCallerName('Unknown Caller');
-      setCallerOrg('External Cellular Carrier');
+      setCallerOrg('External Communication Channel');
       setCallerRole('Unverified Subscriber');
       setCallerHandle('UNVERIFIED');
       setCallerNumber('+91 91234 56789');
       setIsEnrolledCaller(false);
-      setCurrentRiskScore(30);
+      setCurrentRiskScore(28);
       setSpeakerSimilarityScore(0);
       setVoiceAuthenticityScore(0);
-      setMaxObservedRisk(30);
+      setMaxObservedRisk(28);
     }
 
-    // Move to State 2: INCOMING_CALL
     setCallState('INCOMING_CALL');
   };
 
-  // Answer Call -> State 4: ACTIVE_CALL
+  // Answer Call -> Activate Real-Time Voice Security Analysis
   const handleAnswerCall = async () => {
     setStreamError(null);
     const sessionSuffix = Date.now().toString().slice(-4);
@@ -234,10 +236,10 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
     setActiveCallId(sessionCallId);
 
     try {
-      // 1. Create real call session in SQLite database
+      // 1. Register monitored communication session in backend database
       const created = await api.calls.create({
         call_id: sessionCallId,
-        source_type: 'MOBILE_SDK',
+        source_type: 'MOBILE_SECURITY_LAYER',
         action_type: activeScenario === 'CLONED_IMPERSONATION' ? 'EMERGENCY_WIRE_TRANSFER' : 'SECURE_CONVERSATION',
         action_sensitivity: activeScenario === 'CLONED_IMPERSONATION' ? 'CRITICAL' : isEnrolledCaller ? 'MEDIUM' : 'HIGH',
         transaction_amount: activeScenario === 'CLONED_IMPERSONATION' ? 2500000 : undefined,
@@ -247,7 +249,7 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
       });
       setActiveCallSession(created);
 
-      // 2. Initialize WebSocket Audio Streaming Client
+      // 2. Connect WebSocket client for real-time acoustic stream analysis
       const client = new VoiceStreamClient(
         sessionCallId,
         (update) => {
@@ -266,24 +268,23 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
       streamClientRef.current = client;
       client.connect();
 
-      // Transition to State 4: ACTIVE_CALL
       setCallState('ACTIVE_CALL');
 
-      // Controlled Escalation Sequence for Demonstration (if Cloned Impersonation scenario)
+      // Controlled Demonstration Progression
       if (activeScenario === 'CLONED_IMPERSONATION') {
-        // Step 1: After 3 seconds, voice analysis begins
+        // Stage 1: Voice security analysis initializes
         setTimeout(() => {
           setCallState('VOICE_ANALYSIS');
         }, 3000);
 
-        // Step 2: After 7 seconds, acoustic anomalies detect synthetic artifacts (Elevated Risk)
+        // Stage 2: Suspicious communication warning (Elevated Risk)
         setTimeout(() => {
           setCurrentRiskScore(42);
-          setVoiceAuthenticityScore(68);
+          setVoiceAuthenticityScore(65);
           setCallState('ELEVATED_RISK');
         }, 7000);
 
-        // Step 3: After 12 seconds, synthetic score spikes, triggering Voice Impersonation Warning
+        // Stage 3: High-risk impersonation alert (Synthetic artifacts detected)
         setTimeout(() => {
           setCurrentRiskScore(82);
           setVoiceAuthenticityScore(18);
@@ -291,12 +292,12 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
           setCallState('VOICE_IMPERSONATION_WARNING');
         }, 12000);
 
-        // Step 4: After 18 seconds, caller makes sensitive wire request ₹25,00,000
+        // Stage 4: Caller requests high-value action (₹25,00,000 emergency wire)
         setTimeout(() => {
           setCallState('SENSITIVE_ACTION_DETECTED');
         }, 18000);
 
-        // Step 5: After 21 seconds, automated defense policy executes Action Hold
+        // Stage 5: VoiceGuard Automated Policy enforces Action Hold
         setTimeout(async () => {
           setCallState('ACTION_HOLD');
           try {
@@ -307,17 +308,16 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
               simulated_amount: 2500000,
             });
           } catch (e) {
-            console.error('Failed to log automated hold:', e);
+            console.error('Failed to register action hold:', e);
           }
         }, 21000);
       } else {
-        // Legitimate or Unknown Call
         setTimeout(() => {
           setCallState('VOICE_ANALYSIS');
         }, 3000);
       }
     } catch (err: any) {
-      setStreamError(err.message || 'Failed to initialize protected call session');
+      setStreamError(err.message || 'Failed to initialize voice security analysis session');
       setCallState('IDLE');
     }
   };
@@ -328,7 +328,7 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
     setCallState('IDLE');
   };
 
-  // Terminate Call -> State 11: CALL_ENDED -> State 12: POST_CALL_REPORT
+  // End Call -> Disconnect & Fetch Post-Communication Report
   const handleEndCall = async () => {
     setCallState('CALL_ENDED');
     handleStopStream();
@@ -340,7 +340,7 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
         const detail = await api.calls.get(activeCallId);
         setPostCallSummary(detail);
       } catch (err) {
-        console.error('Failed to finalize call session:', err);
+        console.error('Failed to finalize communication session:', err);
       } finally {
         setSummaryLoading(false);
       }
@@ -351,7 +351,7 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
     }, 1200);
   };
 
-  // Stop Audio Stream
+  // Stop Audio Streaming
   const handleStopStream = () => {
     if (streamClientRef.current) {
       streamClientRef.current.stop();
@@ -361,7 +361,7 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
     stopRecording();
   };
 
-  // Trigger Interactive Step-Up Verification
+  // Execute Step-Up Verification
   const handleExecuteVerification = async (method: 'MFA' | 'CALLBACK' | 'SUPERVISOR') => {
     if (!activeCallId) return;
     setVerificationLoading(true);
@@ -372,59 +372,100 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
         await api.security.initiateVerification(
           activeCallId,
           'SUPERVISOR_CALLBACK',
-          `Out-of-band verification callback to ${callerNumber}`
+          `Out-of-band verification callback to registered number ${callerNumber}`
         );
-        setVerificationSuccess(`Out-of-band callback triggered to enrolled phone ${callerNumber}. Incoming untrusted session severed.`);
+        setVerificationSuccess(`Out-of-band callback initiated to ${callerNumber}. Untrusted communication channel held.`);
       } else if (method === 'MFA') {
         await api.security.initiateVerification(
           activeCallId,
           'MFA_CHALLENGE',
-          `Secondary biometric push challenge dispatched to ${callerHandle}`
+          `Push challenge dispatched to enrolled hardware token for ${callerHandle}`
         );
-        setVerificationSuccess(`Push challenge sent to ${callerHandle}'s secured hardware token.`);
+        setVerificationSuccess(`Biometric push challenge sent to ${callerHandle}'s enrolled authenticator.`);
       } else {
-        setVerificationSuccess('Session escalated to Security Operations Center (SOC) supervisor.');
+        setVerificationSuccess('Communication escalated to Enterprise Security Operations Center (SOC).');
       }
     } catch (err: any) {
-      setVerificationSuccess(err.message || 'Verification signal logged.');
+      setVerificationSuccess(err.message || 'Verification signal recorded.');
     } finally {
       setVerificationLoading(false);
     }
   };
 
+  // Determine Current Security Layer State Level
+  const isHighRisk = currentRiskScore >= 65 || callState === 'VOICE_IMPERSONATION_WARNING' || callState === 'ACTION_HOLD';
+  const isWarning = (currentRiskScore >= 35 && currentRiskScore < 65) || callState === 'ELEVATED_RISK';
+  const isSafe = !isHighRisk && !isWarning;
+
   return (
-    <div className="w-full flex flex-col items-center justify-center">
-      {/* 1. Contextual Architecture Banner (SIH Prototype Representation) */}
-      <div className="w-full max-w-sm sm:max-w-md mb-3 px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] font-mono text-slate-300 backdrop-blur-md shadow-lg">
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <div className="flex items-center gap-1.5 font-bold text-cyan-400">
-            <Smartphone className="w-3.5 h-3.5" />
-            <span>CONTROLLED PHONE ENVIRONMENT</span>
+    <div className="w-full flex flex-col items-center justify-center space-y-4">
+      {/* 1. CORE PRODUCT MESSAGE BANNER */}
+      <div className="w-full max-w-lg p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-cyan-950/40 border border-cyan-500/30 text-slate-200 shadow-xl backdrop-blur-md">
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-cyan-950 border border-cyan-500/40 text-cyan-400 shrink-0 mt-0.5">
+            <Shield className="w-5 h-5" />
           </div>
-          <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
-            SIH PROTOTYPE
-          </span>
+          <div className="space-y-1">
+            <div className="text-xs font-mono font-bold tracking-wide text-cyan-300 uppercase flex items-center gap-2">
+              <span>VOICEGUARD MOBILE SECURITY LAYER</span>
+              <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/40">
+                PROTOTYPE INTEGRATION
+              </span>
+            </div>
+            <p className="text-xs text-slate-200 font-semibold leading-relaxed m-0">
+              "VOICEGUARD DOES NOT REPLACE YOUR PHONE. IT PROTECTS THE VOICE COMMUNICATIONS THAT RUN THROUGH IT."
+            </p>
+            <p className="text-[11px] text-slate-400 leading-snug m-0">
+              Like a security layer for web browsing, VoiceGuard adds an AI-driven trust layer around supported voice communication channels.
+            </p>
+          </div>
         </div>
-        <p className="text-[10px] text-slate-400 leading-relaxed m-0">
-          Prototype representation of the <strong>Android VoiceGuard Mobile Security SDK</strong>. Web environment models real-time phone audio capture and in-call defense.
-        </p>
-        <div className="mt-1.5 pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[9px] text-slate-400">
-          <span>Android Client → SDK → Security API → Risk Engine</span>
+
+        {/* Expandable Architecture Flow */}
+        <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono">
+          <button
+            onClick={() => setShowArchDetails(!showArchDetails)}
+            className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold cursor-pointer"
+          >
+            <Layers className="w-3 h-3" />
+            <span>{showArchDetails ? 'Hide' : 'View'} Architectural Security Model</span>
+          </button>
+
           {onNavigateToControlCenter && (
             <button
               onClick={() => onNavigateToControlCenter('overview')}
-              className="text-cyan-400 hover:text-cyan-300 flex items-center gap-0.5 font-semibold cursor-pointer"
+              className="text-slate-300 hover:text-cyan-300 flex items-center gap-1 font-semibold cursor-pointer"
             >
-              <span>Control Center</span>
+              <span>Enterprise Control Center</span>
               <ChevronRight className="w-3 h-3" />
             </button>
           )}
         </div>
+
+        {showArchDetails && (
+          <div className="mt-2.5 p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-[10px] font-mono text-slate-300 space-y-1.5 animate-in fade-in duration-200">
+            <div className="font-bold text-cyan-300">CONCEPTUAL INTEGRATION ARCHITECTURE:</div>
+            <div className="p-2 rounded bg-slate-900 border border-slate-800/80 text-[9px] text-slate-300 leading-relaxed font-mono whitespace-pre-wrap">
+{`USER PHONE (Existing Communication Environment / VoIP / Supported App)
+      ↓ (voice stream)
+🛡 VOICEGUARD SECURITY LAYER
+   ├── Voice Anti-Spoof (AASIST / Acoustic Anomaly)
+   ├── Speaker Verification (128-D Acoustic Embeddings)
+   ├── Context & Behavioral Anomaly Engine
+   └── Risk Fusion Engine → Security Policy (ALLOW / VERIFY / HOLD)
+      ↓
+SECURITY CONTROL CENTER & CRYPTOGRAPHIC AUDIT LEDGER`}
+            </div>
+            <div className="text-[9px] text-slate-400">
+              * The SIH prototype demonstrates the security workflow through a controlled communication environment. Consumes audio from supported integration gateways without universal cellular interception.
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* 2. Physical Smartphone Device Housing */}
+      {/* 2. PHYSICAL DEVICE FRAME (REPRESENTING USER'S PHONE ENVIRONMENT) */}
       <div className="relative w-full max-w-[390px] h-[780px] bg-slate-950 rounded-[44px] p-3 shadow-2xl border-4 border-slate-800 ring-1 ring-cyan-500/20 flex flex-col overflow-hidden select-none">
-        {/* Dynamic Island / Earpiece Speaker Notch */}
+        {/* Dynamic Island / Device Notch */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center justify-center">
           <div className="w-28 h-6 bg-black rounded-full border border-slate-800/80 flex items-center justify-between px-3 text-[10px] font-mono text-slate-400 shadow-inner">
             <div className="w-2 h-2 rounded-full bg-slate-700" />
@@ -437,8 +478,8 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
         </div>
 
         {/* Smartphone Screen Canvas */}
-        <div className="relative w-full h-full bg-[#0a0d14] rounded-[36px] overflow-hidden flex flex-col justify-between pt-9 pb-4 px-4 text-slate-100 border border-slate-800/50">
-          {/* Top Status Bar (Carrier, Time, Battery) */}
+        <div className="relative w-full h-full bg-[#0b0e17] rounded-[36px] overflow-hidden flex flex-col justify-between pt-9 pb-4 px-4 text-slate-100 border border-slate-800/50">
+          {/* Top Status Bar */}
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 px-1 shrink-0">
             <span className="font-semibold text-slate-200">09:41</span>
             <div className="flex items-center gap-2">
@@ -451,27 +492,28 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
           </div>
 
           {/* ========================================================================= */}
-          {/* STATE 1: IDLE / STANDBY (LAUNCHER & SCENARIO SELECTION) */}
+          {/* STATE 1: IDLE (COMMUNICATION ENVIRONMENT WITH SECURITY LAYER ACTIVE) */}
           {/* ========================================================================= */}
           {callState === 'IDLE' && (
             <div className="flex-1 flex flex-col justify-between py-4 space-y-3 overflow-y-auto">
               <div className="text-center pt-2">
-                <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-cyan-950/60 border border-cyan-500/30 text-cyan-400 text-[10px] font-mono font-bold tracking-wider mb-2">
-                  <ShieldCheck className="w-3 h-3" />
-                  <span>VOICEGUARD SHIELD ACTIVE</span>
+                {/* Security Layer Active Badge */}
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono font-bold tracking-wider mb-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>VOICEGUARD PROTECTION ACTIVE</span>
                 </div>
-                <h3 className="text-lg font-bold tracking-tight text-slate-100 m-0">
-                  Protected Phone Client
+                <h3 className="text-base font-bold tracking-tight text-slate-100 m-0">
+                  Supported Communication Channel
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-1 max-w-[280px] mx-auto">
-                  Demonstrates real-time call interception, acoustic verification, and automated wire hold.
+                  Monitoring incoming voice streams for synthetic cloning and executive impersonation.
                 </p>
               </div>
 
-              {/* Authoritative Model Status */}
+              {/* Authoritative Model Telemetry Card */}
               <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-[10px] font-mono text-slate-400 space-y-1">
                 <div className="flex justify-between items-center text-slate-300 font-semibold pb-1 border-b border-slate-800">
-                  <span>BACKEND MODEL STATUS</span>
+                  <span>SECURITY LAYER ENGINE</span>
                   <span className="text-[9px] text-cyan-400">AUTHORITATIVE</span>
                 </div>
                 <div className="flex justify-between">
@@ -488,10 +530,10 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
                 </div>
               </div>
 
-              {/* Controlled Demo Scenarios */}
+              {/* Controlled Inbound Communication Scenarios */}
               <div className="space-y-2">
                 <div className="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider px-1">
-                  Trigger Inbound Call Scenario:
+                  Trigger Inbound Voice Stream:
                 </div>
 
                 {/* Scenario 1: Legitimate Call */}
@@ -509,7 +551,7 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-400 mt-1 font-mono">
-                    Aarav Mehta (Finance Ops) · Authentic Voice Match (96%) · Low Risk
+                    Aarav Mehta (Finance Ops) · Authentic Voice Match (96%) · Safe
                   </div>
                 </button>
 
@@ -528,7 +570,7 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-400 mt-1 font-mono">
-                    Aarav Mehta Claimed · Cloned Synthetic Voice · Emergency Wire Fraud
+                    Aarav Mehta Claimed · Synthetic Voice Cloned · ₹25L Wire Hold
                   </div>
                 </button>
 
@@ -547,20 +589,20 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-400 mt-1 font-mono">
-                    Unregistered external caller · No biometric profile · Risk Unknown
+                    Unregistered external caller · Unverified identity ≠ Malicious
                   </div>
                 </button>
               </div>
 
-              {/* Security Control Center Link */}
+              {/* Navigation to Control Center */}
               <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono">
-                <span className="text-slate-500">Dual-Product View:</span>
+                <span className="text-slate-500">Governance Console:</span>
                 {onNavigateToControlCenter && (
                   <button
                     onClick={() => onNavigateToControlCenter('overview')}
                     className="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 cursor-pointer"
                   >
-                    <span>Open Control Center</span>
+                    <span>Control Center</span>
                     <ExternalLink className="w-3 h-3" />
                   </button>
                 )}
@@ -569,19 +611,20 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
           )}
 
           {/* ========================================================================= */}
-          {/* STATE 2: INCOMING CALL & STATE 3: PRE-CALL TRUST INSPECTION */}
+          {/* STATE 2: INCOMING CALL WITH VOICEGUARD PRE-CALL TRUST INSPECTION OVERLAY */}
           {/* ========================================================================= */}
           {callState === 'INCOMING_CALL' && (
             <div className="flex-1 flex flex-col justify-between py-2 animate-in fade-in zoom-in-95 duration-200">
+              {/* Standard Device Phone Call Screen */}
               <div className="text-center pt-2">
                 <span className="text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase">
-                  INCOMING CALL
+                  INCOMING VOICE COMMUNICATION
                 </span>
 
                 {/* Pulsing Avatar */}
-                <div className="relative mx-auto mt-3 mb-2 w-20 h-20 rounded-full bg-slate-900 border-2 border-cyan-500/50 flex items-center justify-center text-slate-200 shadow-xl shadow-cyan-500/10">
-                  <div className="absolute inset-0 rounded-full border border-cyan-400 animate-ping opacity-30" />
-                  <User className="w-10 h-10 text-cyan-300" />
+                <div className="relative mx-auto mt-3 mb-2 w-20 h-20 rounded-full bg-slate-900 border-2 border-slate-700 flex items-center justify-center text-slate-200 shadow-xl">
+                  <div className="absolute inset-0 rounded-full border border-cyan-400 animate-ping opacity-25" />
+                  <User className="w-10 h-10 text-slate-300" />
                   {isEnrolledCaller && (
                     <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-cyan-950 border border-cyan-400 flex items-center justify-center text-cyan-300">
                       <CheckCircle2 className="w-3.5 h-3.5" />
@@ -598,37 +641,28 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
                 <p className="text-[11px] text-slate-400 m-0">
                   {callerOrg} · {callerNumber}
                 </p>
-                {isEnrolledCaller ? (
-                  <span className="inline-flex items-center gap-1 text-[9px] font-mono font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full mt-1.5">
-                    <CheckCircle2 className="w-2.5 h-2.5" />
-                    <span>VERIFIED IDENTITY (EMP-DEMO-001)</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[9px] font-mono font-bold text-amber-400 bg-amber-950/60 border border-amber-800/60 px-2 py-0.5 rounded-full mt-1.5">
-                    <AlertTriangle className="w-2.5 h-2.5" />
-                    <span>UNVERIFIED IDENTITY (NOT ENROLLED)</span>
-                  </span>
-                )}
               </div>
 
-              {/* State 3: VoiceGuard Pre-Call Trust Inspection Card */}
-              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-cyan-500/40 shadow-xl shadow-cyan-500/10 text-xs font-mono space-y-2">
+              {/* VOICEGUARD PRE-CALL TRUST INSPECTION OVERLAY */}
+              <div className="p-3.5 rounded-2xl bg-slate-900/95 border-2 border-cyan-500/50 shadow-2xl shadow-cyan-500/10 text-xs font-mono space-y-2">
                 <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
                   <div className="flex items-center gap-1.5 text-cyan-400 font-bold text-[10px]">
                     <Shield className="w-3.5 h-3.5" />
                     <span>VOICEGUARD PRE-CALL TRUST INSPECTION</span>
                   </div>
-                  <span className="text-[9px] text-slate-400">ACTIVE</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    PROTECTION ACTIVE
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-800/80">
+                  <div className="p-2 rounded-lg bg-slate-950/80 border border-slate-800">
                     <div className="text-[9px] text-slate-400 uppercase">Voice Authenticity</div>
                     <div className="text-sm font-bold text-emerald-400 mt-0.5">
-                      {isEnrolledCaller ? '96%' : 'PENDING'}
+                      {isEnrolledCaller ? '96%' : 'ANALYSIS PENDING'}
                     </div>
                   </div>
-                  <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-800/80">
+                  <div className="p-2 rounded-lg bg-slate-950/80 border border-slate-800">
                     <div className="text-[9px] text-slate-400 uppercase">Speaker Match</div>
                     <div className="text-sm font-bold text-cyan-400 mt-0.5">
                       {isEnrolledCaller ? '94%' : 'NOT ENROLLED'}
@@ -636,20 +670,26 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/70 border border-slate-800/80 text-[10px]">
-                  <span className="text-slate-400">Pre-Call Risk:</span>
+                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/80 border border-slate-800 text-[10px]">
+                  <span className="text-slate-400">Pre-Call Assessment:</span>
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-slate-200">{currentRiskScore} / 100</span>
                     <span className={`px-1.5 py-0.2 rounded font-bold uppercase text-[9px] ${
-                      currentRiskScore < 25 ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-amber-950 text-amber-300 border border-amber-800'
+                      isEnrolledCaller ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-800 text-slate-300 border border-slate-700'
                     }`}>
-                      {currentRiskScore < 25 ? 'LOW RISK' : 'EVALUATING'}
+                      {isEnrolledCaller ? '🟢 LOW RISK' : '⚪ UNVERIFIED'}
                     </span>
                   </div>
                 </div>
+
+                {!isEnrolledCaller && (
+                  <div className="text-[9px] text-slate-400 italic">
+                    * Unverified caller does not imply malicious intent; evaluation occurs during call.
+                  </div>
+                )}
               </div>
 
-              {/* Call Controls: Decline and Answer */}
+              {/* Standard Device Call Action Buttons */}
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <button
                   onClick={handleDeclineCall}
@@ -671,7 +711,7 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
           )}
 
           {/* ========================================================================= */}
-          {/* STATE 4, 5, 6, 7, 8, 9, 10: ACTIVE CALL & REAL-TIME DEFENSE */}
+          {/* STATE 4, 5, 6, 7, 8, 9, 10: ACTIVE CALL WITH VOICEGUARD SECURITY OVERLAY */}
           {/* ========================================================================= */}
           {[
             'ACTIVE_CALL',
@@ -683,93 +723,111 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
             'STEP_UP_VERIFICATION',
           ].includes(callState) && (
             <div className="flex-1 flex flex-col justify-between py-2 relative overflow-hidden">
-              {/* Active Call Header */}
+              {/* Normal Device Call Screen Header */}
               <div className="text-center pt-1">
-                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 text-[10px] font-mono mb-1">
-                  <Shield className="w-3 h-3 text-cyan-400" />
-                  <span>VOICEGUARD ACTIVE</span>
-                </div>
                 <h3 className="text-base font-bold text-slate-100 m-0">
                   {callerName}
                 </h3>
                 <p className="text-[10px] text-slate-400 font-mono m-0">
                   {callerRole} · {callerOrg}
                 </p>
-                <div className="text-xs font-mono font-bold text-emerald-400 mt-1">
+                <div className="text-xs font-mono font-bold text-slate-300 mt-1">
                   {formatTime(callDurationSec)}
                 </div>
               </div>
 
-              {/* State 5: Real-Time Waveform & Voice Analysis */}
-              <div className="my-2 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono space-y-2">
-                <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-slate-400 flex items-center gap-1">
-                    <Activity className="w-3 h-3 text-cyan-400" />
-                    <span>ACOUSTIC STREAM SPECTRUM</span>
+              {/* VOICEGUARD FLOATING / DOCKED SECURITY OVERLAY */}
+              <div className={`my-2 p-3 rounded-2xl border-2 transition-all duration-300 text-xs font-mono space-y-2 shadow-2xl ${
+                isHighRisk
+                  ? 'bg-rose-950/95 border-rose-500 text-rose-100 shadow-rose-900/40'
+                  : isWarning
+                  ? 'bg-amber-950/90 border-amber-500/80 text-amber-100 shadow-amber-900/30'
+                  : 'bg-slate-900/95 border-emerald-500/50 text-slate-200 shadow-cyan-500/10'
+              }`}>
+                {/* 3 Clear State Badges */}
+                <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/80">
+                  <div className="flex items-center gap-1.5 font-bold text-[10px]">
+                    <Shield className={`w-3.5 h-3.5 ${isHighRisk ? 'text-rose-400' : isWarning ? 'text-amber-400' : 'text-emerald-400'}`} />
+                    <span>
+                      {isHighRisk
+                        ? '🔴 VOICEGUARD PROTECTION ACTIVE'
+                        : isWarning
+                        ? '🟡 VOICEGUARD WARNING'
+                        : '🟢 VOICEGUARD PROTECTION ACTIVE'}
+                    </span>
+                  </div>
+                  <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded uppercase ${
+                    isHighRisk
+                      ? 'bg-rose-900 text-rose-200 border border-rose-700'
+                      : isWarning
+                      ? 'bg-amber-900 text-amber-200 border border-amber-700'
+                      : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                  }`}>
+                    {isHighRisk ? 'CRITICAL RISK' : isWarning ? 'ANOMALY DETECTED' : 'SAFE COMMUNICATION'}
                   </span>
-                  <span className="text-[9px] text-cyan-400 font-bold">16 kHz PCM</span>
                 </div>
 
-                {/* Real Dynamic Waveform Visualizer */}
-                <div className="h-10 w-full bg-slate-950 rounded-lg overflow-hidden border border-slate-800/80 flex items-center justify-center px-1">
+                {/* Acoustic Audio Waveform */}
+                <div className="h-9 w-full bg-slate-950 rounded-lg overflow-hidden border border-slate-800/80 flex items-center justify-center px-1">
                   {analyserNode ? (
-                    <WaveformVisualizer analyserNode={analyserNode} isActive={isRecording} height={40} />
+                    <WaveformVisualizer
+                      analyserNode={analyserNode}
+                      isActive={isRecording}
+                      height={36}
+                      color={isHighRisk ? '#f43f5e' : isWarning ? '#fbbf24' : '#06b6d4'}
+                    />
                   ) : (
                     <div className="flex items-center gap-1 text-[9px] text-slate-500">
                       <Activity className="w-3 h-3 animate-pulse" />
-                      <span>Audio Processing Active</span>
+                      <span>Voice Security Analysis Active</span>
                     </div>
                   )}
                 </div>
 
-                {/* State 7 Architectural Distinction: Claimed Identity vs Voice Authenticity */}
-                <div className="space-y-1.5 pt-1 border-t border-slate-800/60 text-[10px]">
+                {/* Telemetry Breakdown: Identity vs Authenticity */}
+                <div className="space-y-1 pt-1 border-t border-slate-800/60 text-[10px]">
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">CLAIMED IDENTITY:</span>
-                    <span className="font-bold text-slate-200">
-                      {callerName} ({isEnrolledCaller ? '✓ REGISTERED' : 'UNREGISTERED'})
+                    <span className="text-slate-400">Claimed Identity:</span>
+                    <strong className="text-slate-200">{callerName} ({isEnrolledCaller ? '✓ Verified' : 'Unverified'})</strong>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Speaker Match:</span>
+                    <span className={`font-bold ${speakerSimilarityScore > 75 ? 'text-cyan-300' : 'text-slate-400'}`}>
+                      {speakerSimilarityScore > 0 ? `${speakerSimilarityScore}%` : 'NOT ENROLLED'}
                     </span>
                   </div>
 
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">SPEAKER SIMILARITY:</span>
-                    <span className={`font-bold ${speakerSimilarityScore > 75 ? 'text-cyan-400' : 'text-slate-400'}`}>
-                      {speakerSimilarityScore > 0 ? `${speakerSimilarityScore}% (HIGH)` : 'NOT ENROLLED'}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">VOICE AUTHENTICITY:</span>
+                    <span className="text-slate-400">Voice Authenticity:</span>
                     <span className={`font-bold ${voiceAuthenticityScore < 40 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                      {voiceAuthenticityScore > 0 ? `${voiceAuthenticityScore}% (${voiceAuthenticityScore < 40 ? 'LOW' : 'HIGH'})` : 'ANALYSIS PENDING'}
+                      {voiceAuthenticityScore > 0 ? `${voiceAuthenticityScore}%` : 'ANALYZING...'}
                     </span>
                   </div>
 
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">OVERALL RISK SCORE:</span>
-                    <span className={`font-bold text-xs ${
-                      currentRiskScore >= 65 ? 'text-rose-400' : currentRiskScore >= 35 ? 'text-amber-400' : 'text-emerald-400'
-                    }`}>
-                      {currentRiskScore} / 100 {currentRiskScore >= 65 ? '🔴 CRITICAL' : currentRiskScore >= 35 ? '🟡 MEDIUM' : '🟢 LOW'}
+                    <span className="text-slate-400">Risk Assessment:</span>
+                    <span className={`font-bold ${isHighRisk ? 'text-rose-400' : isWarning ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      {currentRiskScore} / 100
                     </span>
                   </div>
                 </div>
 
-                {/* Core Impersonation Explainer */}
-                {callState === 'VOICE_IMPERSONATION_WARNING' || currentRiskScore >= 65 ? (
-                  <div className="p-2 rounded bg-rose-950/40 border border-rose-900/60 text-[9px] text-rose-300 leading-tight">
-                    <strong>AI Impersonation Alert:</strong> Cloned voice exhibits high speaker similarity ({speakerSimilarityScore}%) but low voice authenticity ({voiceAuthenticityScore}%), indicating neural voice synthesis.
+                {/* Explanatory Message on Impersonation Alert */}
+                {isHighRisk && (
+                  <div className="p-2 rounded bg-rose-950/60 border border-rose-800/80 text-[9px] text-rose-200 leading-tight">
+                    <strong>Potential Voice Impersonation Detected:</strong> High speaker similarity ({speakerSimilarityScore}%) coupled with low voice authenticity ({voiceAuthenticityScore}%) indicates synthetic speech synthesis.
                   </div>
-                ) : null}
+                )}
               </div>
 
-              {/* State 8 & 9: Sensitive Action Hold Notification (Emergency Wire ₹25,00,000) */}
+              {/* SENSITIVE ACTION HOLD OVERLAY (SIMULATED WIRE TRANSFER ₹25,00,000) */}
               {(callState === 'SENSITIVE_ACTION_DETECTED' || callState === 'ACTION_HOLD') && !actionHoldDismissed && (
-                <div className="p-3 rounded-xl bg-rose-950/90 border border-rose-500/80 shadow-2xl text-xs font-mono space-y-2 animate-in slide-in-from-bottom-2 duration-300">
+                <div className="p-3 rounded-xl bg-rose-950/95 border-2 border-rose-500 shadow-2xl text-xs font-mono space-y-2 animate-in slide-in-from-bottom-2 duration-300">
                   <div className="flex items-center justify-between pb-1 border-b border-rose-800">
                     <span className="text-rose-300 font-bold flex items-center gap-1.5 text-[10px]">
                       <AlertOctagon className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
-                      <span>SENSITIVE ACTION DETECTED</span>
+                      <span>SENSITIVE REQUEST DETECTED</span>
                     </span>
                     <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-900 text-rose-200 border border-rose-700">
                       CRITICAL
@@ -780,19 +838,19 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
                     Caller requested: <strong className="text-rose-300">"Approve an emergency offshore wire transfer."</strong>
                   </div>
 
-                  <div className="flex justify-between items-center bg-rose-950/60 p-1.5 rounded border border-rose-900 text-[10px]">
-                    <span className="text-slate-400">Simulated Amount:</span>
-                    <strong className="text-rose-300 text-xs font-bold">₹25,00,000</strong>
+                  <div className="flex justify-between items-center bg-rose-950/70 p-1.5 rounded border border-rose-900 text-[10px]">
+                    <span className="text-slate-400">Simulated Action:</span>
+                    <strong className="text-rose-300 text-xs font-bold">₹25,00,000 Financial Wire</strong>
                   </div>
 
-                  <div className="p-1.5 rounded bg-rose-900/40 border border-rose-700/60 text-[9px] text-rose-200">
-                    <strong>SECURITY RESPONSE: 🔴 ACTION ON HOLD</strong>
+                  <div className="p-1.5 rounded bg-rose-900/50 border border-rose-700 text-[9px] text-rose-200">
+                    <strong>SECURITY DECISION: 🔴 ACTION ON HOLD</strong>
                     <p className="m-0 mt-0.5 text-slate-300">
-                      Automated defense held transfer pending step-up verification. No real transaction executed.
+                      Automated defense policy held action pending step-up verification. (Simulated demonstration).
                     </p>
                   </div>
 
-                  {/* Step-Up Verification Action Buttons */}
+                  {/* Step-Up Identity Challenge Buttons */}
                   <div className="grid grid-cols-3 gap-1.5 pt-1 text-[9px]">
                     <button
                       onClick={() => handleExecuteVerification('MFA')}
@@ -825,7 +883,7 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
                 </div>
               )}
 
-              {/* Standard In-Call Controls (Mute, Speaker, End) */}
+              {/* Standard Communication Controls (Mute, Speaker, End Call) */}
               <div className="space-y-3 pt-2">
                 <div className="flex items-center justify-around px-4">
                   <button
@@ -853,26 +911,26 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
                   <button
                     onClick={() => handleExecuteVerification('CALLBACK')}
                     className="p-3 rounded-full bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800 transition cursor-pointer"
-                    title="Out-of-band Supervisor Callback"
+                    title="Initiate Out-of-band Callback"
                   >
                     <PhoneForwarded className="w-5 h-5 text-amber-400" />
                   </button>
                 </div>
 
-                {/* Hang Up Button */}
+                {/* Device Hang-Up Button */}
                 <button
                   onClick={handleEndCall}
                   className="w-full py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30 transition cursor-pointer"
                 >
                   <PhoneOff className="w-4 h-4" />
-                  <span>END CALL</span>
+                  <span>END COMMUNICATION</span>
                 </button>
               </div>
             </div>
           )}
 
           {/* ========================================================================= */}
-          {/* STATE 11: CALL ENDED (TRANSITION STATE) */}
+          {/* STATE 11: CALL ENDED */}
           {/* ========================================================================= */}
           {callState === 'CALL_ENDED' && (
             <div className="flex-1 flex flex-col items-center justify-center text-center space-y-3 font-mono">
@@ -880,14 +938,14 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
                 <PhoneOff className="w-8 h-8" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-200 m-0">Call Ended</h3>
-                <p className="text-xs text-slate-400 mt-1">Generating VoiceGuard Security Report...</p>
+                <h3 className="text-base font-bold text-slate-200 m-0">Communication Ended</h3>
+                <p className="text-xs text-slate-400 mt-1">Generating VoiceGuard Security Summary...</p>
               </div>
             </div>
           )}
 
           {/* ========================================================================= */}
-          {/* STATE 12: POST-CALL SECURITY REPORT */}
+          {/* STATE 12: POST-COMMUNICATION SECURITY SUMMARY */}
           {/* ========================================================================= */}
           {callState === 'POST_CALL_REPORT' && (
             <div className="flex-1 flex flex-col justify-between py-2 space-y-3 overflow-y-auto animate-in fade-in duration-300">
@@ -896,10 +954,10 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
                   <ShieldCheck className="w-6 h-6" />
                 </div>
                 <h3 className="text-base font-bold text-slate-100 m-0">
-                  Call Security Summary
+                  VoiceGuard Security Summary
                 </h3>
                 <p className="text-[10px] font-mono text-slate-400 mt-0.5">
-                  Session ID: <strong className="text-slate-200">{activeCallId || 'CALL-DEMO-001'}</strong>
+                  Monitored Session: <strong className="text-slate-200">{activeCallId || 'CALL-DEMO-001'}</strong>
                 </p>
               </div>
 
@@ -939,10 +997,10 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
                 </div>
 
                 <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px]">
-                  <span className="text-slate-400">Cryptographic Audit:</span>
+                  <span className="text-slate-400">Cryptographic Ledger:</span>
                   <span className="text-emerald-400 font-bold flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3" />
-                    <span>SHA-256 RECORDED</span>
+                    <span>SHA-256 SEALED</span>
                   </span>
                 </div>
               </div>
@@ -973,13 +1031,13 @@ export const ProtectedPhone: React.FC<ProtectedPhoneProps> = ({
                   onClick={() => setCallState('IDLE')}
                   className="w-full py-2 text-center text-xs font-mono text-slate-400 hover:text-slate-200 cursor-pointer"
                 >
-                  Return to Phone Standby
+                  Return to Standby Mode
                 </button>
               </div>
             </div>
           )}
 
-          {/* Smartphone Bottom Home Bar */}
+          {/* Device Home Bar */}
           <div className="pt-2 flex justify-center shrink-0">
             <div className="w-32 h-1 bg-slate-700 rounded-full" />
           </div>

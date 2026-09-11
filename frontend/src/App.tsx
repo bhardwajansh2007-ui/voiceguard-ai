@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Smartphone, LayoutDashboard } from 'lucide-react';
+import { Smartphone, LayoutDashboard, Shield } from 'lucide-react';
 import { api } from './services/api';
 import { User } from './types';
 import { Navbar } from './components/Navbar';
@@ -82,14 +82,14 @@ export function App() {
         <header className="h-14 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md px-3 md:px-6 flex items-center justify-between sticky top-0 z-40">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-cyan-950 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shadow-md shadow-cyan-500/20">
-              <Smartphone className="w-4 h-4" />
+              <Shield className="w-4 h-4" />
             </div>
             <div>
               <div className="text-xs font-mono font-bold text-slate-100 uppercase tracking-wider">
-                VOICEGUARD <span className="text-cyan-400">PHONE CLIENT</span>
+                VOICEGUARD <span className="text-cyan-400">MOBILE SECURITY LAYER</span>
               </div>
               <div className="text-[10px] text-slate-400 font-mono">
-                Mobile Security Layer · Client Runtime
+                Active Voice Trust Layer · Protects Supported Channels
               </div>
             </div>
           </div>
