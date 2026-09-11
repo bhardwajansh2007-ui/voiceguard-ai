@@ -6,8 +6,8 @@ from backend.app.schemas.analysis import AntiSpoofResult
 
 class BaseAntiSpoofModel(ABC):
     """
-    Standard interface for Voice Anti-Spoofing and Deepfake Detection models.
-    Supports AASIST, RawNet2, WavLM, or acoustic anomaly architectures.
+    Abstract interface for Voice Anti-Spoofing & Deepfake Detection models.
+    Supports AASIST, RawNet2, or acoustic anomaly architectures.
     """
 
     @abstractmethod

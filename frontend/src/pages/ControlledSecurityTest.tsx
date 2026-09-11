@@ -121,17 +121,19 @@ export const ControlledSecurityTest: React.FC<ControlledSecurityTestProps> = ({
       const analysisResp = await api.calls.uploadAudio(session.call_id, audioFile);
       const detail: CallDetailResponse = await api.calls.get(session.call_id);
 
-      const isSpoof = detail.latest_analysis?.anti_spoof_status === 'SPOOF';
-      const genuineProb = detail.latest_analysis?.genuine_probability ?? (1.0 - (detail.latest_analysis?.spoof_probability ?? 0.5));
+      if (!detail.latest_analysis || !detail.latest_risk || !detail.latest_decision) {
+        throw new Error('Backend did not return complete analysis, risk, or decision records for the scenario.');
+      }
+
+      const isSpoof = detail.latest_analysis.anti_spoof_status === 'SPOOF';
+      const genuineProb = detail.latest_analysis.genuine_probability ?? (detail.latest_analysis.spoof_probability !== null ? 1.0 - detail.latest_analysis.spoof_probability : 0.0);
       const authenticityScore = Math.round(genuineProb * 100);
-      const speakerSimilarity = detail.latest_analysis?.speaker_similarity !== null && detail.latest_analysis?.speaker_similarity !== undefined
+      const speakerSimilarity = detail.latest_analysis.speaker_similarity !== null && detail.latest_analysis.speaker_similarity !== undefined
         ? Math.round(detail.latest_analysis.speaker_similarity * 100)
         : 0;
-      const riskScore = Math.round(detail.latest_risk?.overall_risk_score ?? (isSpoof ? 85 : 15));
-      const policyDecision = (detail.latest_decision?.decision as any) || (isSpoof ? 'ACTION_HOLD' : 'ALLOW');
-      const explanation = detail.latest_decision?.reason || (isSpoof
-        ? 'AASIST anti-spoof model detected synthetic acoustic signatures on CUDA. Action held automatically.'
-        : 'Neural biometric acoustic embeddings and AASIST confirmed authentic human voice.');
+      const riskScore = Math.round(detail.latest_risk.overall_risk_score);
+      const policyDecision = detail.latest_decision.decision as any;
+      const explanation = detail.latest_decision.reason;
 
       setTestResult({
         callId: session.call_id,
@@ -174,25 +176,31 @@ export const ControlledSecurityTest: React.FC<ControlledSecurityTestProps> = ({
       await api.calls.uploadAudio(session.call_id, file);
       const detail: CallDetailResponse = await api.calls.get(session.call_id);
 
-      const isSpoof = detail.latest_analysis?.anti_spoof_status === 'SPOOF';
-      const spoofProb = detail.latest_analysis?.spoof_probability ?? 0.1;
-      const genuineScore = Math.round((1 - spoofProb) * 100);
-      const speakerSim = Math.round((detail.latest_analysis?.speaker_similarity ?? 0.8) * 100);
-      const overallRisk = detail.latest_risk?.overall_risk_score ?? (isSpoof ? 85 : 18);
-      const decision = (detail.latest_decision?.decision as any) || (isSpoof ? 'ACTION_HOLD' : 'ALLOW');
+      const analysis = detail.latest_analysis;
+      const riskAssessment = detail.latest_risk;
+      const decisionRec = detail.latest_decision;
+
+      if (!analysis || !riskAssessment || !decisionRec) {
+        throw new Error('Backend did not return a complete analysis or risk assessment for the uploaded file.');
+      }
+
+      const isSpoof = analysis.anti_spoof_status === 'SPOOF';
+      const genuineProb = analysis.genuine_probability ?? (analysis.spoof_probability !== null ? 1 - analysis.spoof_probability : 0);
+      const authenticityScore = Math.round(genuineProb * 100);
+      const speakerSim = analysis.speaker_similarity !== null ? Math.round(analysis.speaker_similarity * 100) : 0;
+      const overallRisk = Math.round(riskAssessment.overall_risk_score);
+      const decision = decisionRec.decision as any;
 
       setTestResult({
         callId: session.call_id,
         scenario: 'Audio Upload: ' + file.name,
         caller: 'Uploaded Acoustic Sample',
         claimedIdentity: 'EMP-DEMO-001',
-        authenticityScore: genuineScore,
+        authenticityScore,
         speakerSimilarity: speakerSim,
         riskScore: overallRisk,
         policyDecision: decision,
-        explanation: isSpoof
-          ? 'Deepfake synthesis detected by AASIST feature analyzer. High spoof probability with synthetic spectral signatures.'
-          : 'Acoustic feature extractor confirmed natural human pitch variation and harmonic ratios. Within nominal limits.',
+        explanation: decisionRec.reason,
         auditSealed: true,
         rawAnalysis: detail.latest_analysis,
       });
@@ -264,7 +272,7 @@ export const ControlledSecurityTest: React.FC<ControlledSecurityTestProps> = ({
               Test Legitimate Voice
             </h3>
             <p className="text-xs text-slate-400 mt-1">
-              Simulates authentic speech from enrolled speaker Aarav Mehta. Evaluates genuine acoustic micro-textures and low risk (14/100).
+              Simulates authentic speech from enrolled speaker Aarav Mehta. Evaluates genuine acoustic micro-textures and verifies low-risk policy enforcement.
             </p>
             <div className="mt-3 space-y-1 font-mono text-[10px] text-slate-400 bg-slate-950/60 p-2 rounded border border-slate-800/60">
               <div>Target: <span className="text-slate-200">Aarav Mehta</span></div>
@@ -516,22 +524,25 @@ export const ControlledSecurityTest: React.FC<ControlledSecurityTestProps> = ({
             {/* 2. Speaker Match */}
             <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1">
               <div className="text-[11px] text-slate-400 flex justify-between">
-                <span>SPEAKER VERIFICATION</span>
-                <span className="text-cyan-400 font-bold">
-                  {testResult.speakerSimilarity > 0 ? `${testResult.speakerSimilarity}% MATCH` : 'NOT ENROLLED'}
+                <span>SPEAKER SIMILARITY</span>
+                <span className={testResult.speakerSimilarity > 0 ? (testResult.speakerSimilarity >= 88 ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold') : 'text-slate-500 font-bold'}>
+                  {testResult.speakerSimilarity > 0 ? (testResult.speakerSimilarity >= 88 ? 'MATCH' : 'MISMATCH') : 'NOT ENROLLED'}
                 </span>
               </div>
-              <div className="text-2xl font-bold text-slate-100">
-                {testResult.speakerSimilarity > 0 ? `${testResult.speakerSimilarity}%` : 'N/A'}
+              <div className="text-2xl font-bold text-slate-100 flex items-baseline gap-2">
+                <span>{testResult.speakerSimilarity > 0 ? (testResult.speakerSimilarity / 100).toFixed(3) : 'N/A'}</span>
+                {testResult.speakerSimilarity > 0 && (
+                  <span className="text-xs text-slate-400 font-normal">cosine</span>
+                )}
               </div>
               <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-cyan-400 transition-all duration-500"
+                  className={`h-full transition-all duration-500 ${testResult.speakerSimilarity >= 88 ? 'bg-emerald-400' : 'bg-amber-400'}`}
                   style={{ width: `${testResult.speakerSimilarity}%` }}
                 />
               </div>
               <div className="text-[9px] text-slate-500">
-                128-dimensional acoustic embedding similarity
+                128-D acoustic representation (Threshold: 0.880 · Similarity ≠ Probability)
               </div>
             </div>
 

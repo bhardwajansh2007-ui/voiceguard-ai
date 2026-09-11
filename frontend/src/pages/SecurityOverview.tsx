@@ -264,10 +264,10 @@ export const SecurityOverview: React.FC<SecurityOverviewProps> = ({
             <Terminal className="w-3.5 h-3.5 text-purple-400" />
           </div>
           <div className="text-base font-bold font-mono text-purple-400">
-            AASIST + ECAPA
+            AASIST + Acoustic
           </div>
           <div className="text-[10px] text-slate-500 mt-0.5">
-            Voice anti-spoof + embeddings
+            Voice anti-spoof + 128-D prosodic vectors
           </div>
         </div>
       </div>

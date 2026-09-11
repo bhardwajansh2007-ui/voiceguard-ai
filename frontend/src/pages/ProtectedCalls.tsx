@@ -634,7 +634,7 @@ export const ProtectedCalls: React.FC<ProtectedCallsProps> = ({
                     Analyze Forensic Audio Recording
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1 max-w-md mx-auto">
-                    Upload a WAV or MP3 recording. Audio will be evaluated through AASIST anti-spoof inference and ECAPA-TDNN biometric cosine distance.
+                    Upload a WAV or MP3 recording. Audio will be evaluated through AASIST anti-spoof inference and 128-D acoustic-prosodic biometric cosine distance.
                   </p>
 
                   <input

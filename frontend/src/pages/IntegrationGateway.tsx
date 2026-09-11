@@ -180,7 +180,7 @@ ws.onmessage = (event) => {
             <div className="text-[10px] text-cyan-400 uppercase tracking-wider font-bold">STAGE 3</div>
             <div className="text-sm font-bold text-slate-200">ML Defense Ensemble</div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Concurrent anti-spoof synthetic phase detection (WavLM) and speaker biometric verification (ECAPA-TDNN).
+              Concurrent anti-spoof synthetic phase detection (AASIST Graph Attention Network) and speaker matching (128-D acoustic-prosodic representation).
             </p>
             <div className="pt-2 text-[10px] text-purple-400">Confidence Calibration & Fallbacks</div>
           </div>

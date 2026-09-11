@@ -122,9 +122,13 @@ class AcousticFeatureExtractor:
         mfccs = _dct_type2(log_mel, n=self.n_mfcc)
         mfcc_list = [float(x) for x in mfccs]
 
-        # 5. Fundamental Frequency (F0 Pitch) via Autocorrelation
-        corr = np.correlate(audio, audio, mode="full")
-        corr = corr[len(corr) // 2 :]
+        # 5. Fundamental Frequency (F0 Pitch) via Fast FFT Autocorrelation
+        # Limit pitch analysis segment to 48000 samples (~3.0s) for real-time responsiveness
+        analysis_audio = audio[:48000] if len(audio) > 48000 else audio
+        n_pts = len(analysis_audio)
+        n_fft_corr = 1 << (2 * n_pts - 1).bit_length()
+        fx = np.fft.rfft(analysis_audio, n=n_fft_corr)
+        corr = np.fft.irfft(fx * np.conj(fx))[:n_pts]
 
         # Search in human vocal range (60 Hz to 450 Hz)
         min_lag = int(self.sample_rate / 450)
@@ -134,9 +138,9 @@ class AcousticFeatureExtractor:
         jitter = 0.0
         shimmer = 0.0
 
-        if len(corr) > max_lag:
+        if len(corr) > max_lag and corr[0] > 1e-6:
             window_corr = corr[min_lag:max_lag]
-            peak_lag = min_lag + np.argmax(window_corr)
+            peak_lag = min_lag + int(np.argmax(window_corr))
             if corr[peak_lag] > 0.3 * corr[0]:
                 f0 = float(self.sample_rate / peak_lag)
 
@@ -144,21 +148,24 @@ class AcousticFeatureExtractor:
                 chunk_len = peak_lag * 2
                 periods = []
                 amplitudes = []
-                for s in range(0, len(audio) - chunk_len, chunk_len):
-                    sub_audio = audio[s : s + chunk_len]
-                    sub_corr = np.correlate(sub_audio, sub_audio, mode="full")
-                    sub_corr = sub_corr[len(sub_corr) // 2 :]
-                    if len(sub_corr) > peak_lag:
-                        p_idx = min_lag + np.argmax(sub_corr[min_lag : min(len(sub_corr), max_lag)])
+                # Sub-sample up to 16 chunks to keep jitter/shimmer estimation deterministic & fast
+                max_chunks = 16
+                step = max(chunk_len, (len(analysis_audio) - chunk_len) // max_chunks) if len(analysis_audio) > chunk_len * 2 else chunk_len
+                for s in range(0, len(analysis_audio) - chunk_len, step):
+                    sub_audio = analysis_audio[s : s + chunk_len]
+                    sub_fx = np.fft.rfft(sub_audio, n=chunk_len * 2)
+                    sub_corr = np.fft.irfft(sub_fx * np.conj(sub_fx))[:chunk_len]
+                    if len(sub_corr) > min_lag:
+                        p_idx = min_lag + int(np.argmax(sub_corr[min_lag : min(len(sub_corr), max_lag)]))
                         periods.append(p_idx)
-                        amplitudes.append(np.max(np.abs(sub_audio)))
+                        amplitudes.append(float(np.max(np.abs(sub_audio))))
 
                 if len(periods) > 2:
                     period_diffs = np.abs(np.diff(periods))
-                    jitter = float(np.mean(period_diffs) / np.mean(periods))
+                    jitter = float(np.mean(period_diffs) / (np.mean(periods) + 1e-6))
                 if len(amplitudes) > 2 and np.mean(amplitudes) > 1e-4:
                     amp_diffs = np.abs(np.diff(amplitudes))
-                    shimmer = float(np.mean(amp_diffs) / np.mean(amplitudes))
+                    shimmer = float(np.mean(amp_diffs) / (np.mean(amplitudes) + 1e-6))
 
         return AcousticFeatures(
             duration_seconds=round(duration_seconds, 3),

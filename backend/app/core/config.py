@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     # Machine Learning Models
     ANTI_SPOOF_MODEL_PATH: str = "backend/app/services/ml/anti_spoof/checkpoints/AASIST.pth"
     SPEAKER_VERIFICATION_MODEL_PATH: str = ""
+    SPEAKER_VERIFICATION_THRESHOLD: float = 0.880  # Empirically calibrated in Phase 1E (FAR=0.0000, FRR=0.0000)
     DEVICE: str = "auto"  # cpu, cuda, auto
 
     # Risk Thresholds

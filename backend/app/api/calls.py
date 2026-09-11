@@ -15,6 +15,7 @@ from backend.app.models.database_models import (
     SpeakerEmbedding,
 )
 from backend.app.schemas.call import CallCreate, CallContextUpdate, CallResponse
+from backend.app.core.config import settings
 from backend.app.core.security import get_current_user
 from backend.app.services.audio.validator import validate_audio_file
 from backend.app.services.audio.preprocessor import AudioPreprocessor
@@ -26,6 +27,8 @@ from backend.app.services.risk.behavioral import behavioral_engine
 from backend.app.services.risk.context_engine import context_risk_engine
 from backend.app.services.risk.fusion_engine import risk_fusion_engine
 from backend.app.services.security.policy_engine import policy_engine
+from backend.app.services.audio.quality_engine import quality_engine
+from backend.app.services.ml.anti_spoof.replay_detector import replay_detector
 from backend.app.services.audit.ledger import audit_ledger
 from backend.app.schemas.analysis import SpeakerVerificationResult
 from backend.app.core.logging import logger
@@ -96,6 +99,36 @@ def list_calls(
         query = query.filter(CallSession.status == status_filter.upper())
     calls = query.order_by(CallSession.created_at.desc()).offset(offset).limit(limit).all()
     return calls
+
+
+@router.post("/demo/reset")
+def reset_demo_state(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    SIH Evaluator Demo Reset:
+    Resets transient demo state: terminates active call sessions without wiping
+    permanent speaker biometric baselines, trained model weights, or audit history.
+    """
+    active_calls = db.query(CallSession).filter(CallSession.status.in_(["ACTIVE", "HOLD"])).all()
+    for c in active_calls:
+        c.status = "TERMINATED"
+        c.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    audit_ledger.record_event(
+        db=db,
+        event_type="DEMO_STATE_RESET",
+        payload={"terminated_sessions": len(active_calls)},
+        actor=current_user.get("sub", "EVALUATOR"),
+    )
+
+    return {
+        "status": "RESET_SUCCESSFUL",
+        "terminated_active_sessions": len(active_calls),
+        "message": "Demo call state reset cleanly. Biometric profiles and models preserved.",
+    }
 
 
 @router.get("/{call_id}")
@@ -178,6 +211,116 @@ def get_call_detail(
     }
 
 
+@router.get("/{call_id}/risk")
+def get_call_risk(
+    call_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Authoritative endpoint returning fused risk score and signal breakdown."""
+    call = db.query(CallSession).filter(CallSession.call_id == call_id).first()
+    if not call:
+        raise HTTPException(status_code=404, detail=f"Call session {call_id} not found.")
+    risk = db.query(RiskAssessment).filter(RiskAssessment.call_id == call.id).order_by(RiskAssessment.created_at.desc()).first()
+    if not risk:
+        raise HTTPException(status_code=404, detail="Risk assessment not available for this session.")
+    return {
+        "call_id": call_id,
+        "overall_risk_score": risk.overall_risk_score,
+        "risk_level": risk.risk_level,
+        "signal_values": json.loads(risk.signal_values_json) if risk.signal_values_json else {},
+        "weights_used": json.loads(risk.weights_used_json) if risk.weights_used_json else {},
+        "contributing_factors": json.loads(risk.contributing_factors_json) if risk.contributing_factors_json else [],
+        "assessed_at": risk.created_at,
+    }
+
+
+@router.get("/{call_id}/analysis")
+def get_call_analysis(
+    call_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Authoritative endpoint returning full physical and ML acoustic analysis."""
+    call = db.query(CallSession).filter(CallSession.call_id == call_id).first()
+    if not call:
+        raise HTTPException(status_code=404, detail=f"Call session {call_id} not found.")
+    analysis = db.query(AudioAnalysis).filter(AudioAnalysis.call_id == call.id).order_by(AudioAnalysis.created_at.desc()).first()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Audio analysis not available for this session.")
+    return {
+        "call_id": call_id,
+        "duration_seconds": analysis.duration_seconds,
+        "sample_rate": analysis.sample_rate,
+        "vad_speech_ratio": analysis.vad_speech_ratio,
+        "deepfake_status": analysis.anti_spoof_status,
+        "deepfake_score": analysis.spoof_probability,
+        "authenticity_score": analysis.genuine_probability,
+        "confidence": analysis.model_confidence,
+        "speaker_status": analysis.speaker_verification_status,
+        "speaker_similarity": analysis.speaker_similarity,
+        "behavioral_risk": analysis.behavioral_risk_score,
+        "model_version": analysis.model_version,
+        "analyzed_at": analysis.created_at,
+    }
+
+
+@router.get("/{call_id}/timeline")
+def get_call_timeline(
+    call_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Returns chronologically ordered windowed analysis segments for temporal integrity visualization."""
+    call = db.query(CallSession).filter(CallSession.call_id == call_id).first()
+    if not call:
+        raise HTTPException(status_code=404, detail=f"Call session {call_id} not found.")
+    analyses = db.query(AudioAnalysis).filter(AudioAnalysis.call_id == call.id).order_by(AudioAnalysis.created_at.asc()).all()
+    timeline = []
+    for idx, a in enumerate(analyses):
+        timeline.append({
+            "segment_index": idx,
+            "duration_seconds": a.duration_seconds,
+            "anti_spoof_status": a.anti_spoof_status,
+            "authenticity_score": a.genuine_probability,
+            "spoof_probability": a.spoof_probability,
+            "confidence": a.model_confidence,
+            "speaker_similarity": a.speaker_similarity,
+            "timestamp": a.created_at,
+        })
+    return {
+        "call_id": call_id,
+        "total_segments": len(timeline),
+        "timeline": timeline,
+    }
+
+
+@router.get("/{call_id}/audit")
+def get_call_audit_trail(
+    call_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Returns the cryptographically sealed audit trail for this call session."""
+    call = db.query(CallSession).filter(CallSession.call_id == call_id).first()
+    if not call:
+        raise HTTPException(status_code=404, detail=f"Call session {call_id} not found.")
+    from backend.app.models.database_models import AuditEvent
+    events = db.query(AuditEvent).filter(AuditEvent.call_id == call.id).order_by(AuditEvent.created_at.asc()).all()
+    return [
+        {
+            "event_id": e.event_id,
+            "event_type": e.event_type,
+            "event_hash": e.event_hash,
+            "previous_event_hash": e.previous_event_hash,
+            "actor": e.actor,
+            "created_at": e.created_at,
+            "payload": json.loads(e.payload_json) if e.payload_json else {},
+        }
+        for e in events
+    ]
+
+
 @router.patch("/{call_id}/context", response_model=CallResponse)
 def update_call_context(
     call_id: str,
@@ -243,11 +386,38 @@ async def analyze_audio_upload(
     # 3. Voice Activity Detection (VAD)
     is_speech, vad_ratio, _ = vad_detector.process(audio_data)
 
+    # Compute Forensic Audio Integrity Hash
+    import hashlib
+    audio_sha256 = hashlib.sha256(audio_data.tobytes()).hexdigest()
+    diagnostic = {
+        "audio_sha256": audio_sha256,
+        "duration_seconds": round(duration_sec, 3),
+        "sample_rate": 16000,
+        "sample_count": len(audio_data),
+        "vad_speech_ratio": round(vad_ratio, 3),
+        "inference_device": anti_spoof_adapter.device,
+        "inference_timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    logger.info(
+        f"Forensic audio inference: call={call_id} sha256={audio_sha256[:16]}... "
+        f"samples={len(audio_data)} dur={duration_sec:.2f}s device={anti_spoof_adapter.device}"
+    )
+
     # 4. Feature Extraction (MFCC, Spectral, F0 Pitch, Jitter, Shimmer)
     acoustic_features = extractor.extract_features(audio_data, vad_speech_ratio=vad_ratio)
 
     # 5. ML Voice Anti-Spoofing Inference
     anti_spoof_res = anti_spoof_adapter.predict(audio_data)
+
+    # Signal Quality & Replay Anomaly Evaluation
+    quality_report = quality_engine.analyze(audio_data, 16000, vad_ratio, anti_spoof_res.genuine_probability)
+    replay_res = replay_detector.analyze(audio_data, 16000)
+    diagnostic["audio_quality"] = quality_report.audio_quality
+    diagnostic["quality_score"] = quality_report.quality_score
+    diagnostic["analysis_confidence"] = quality_report.analysis_confidence
+    diagnostic["uncertainty_reason"] = quality_report.uncertainty_reason
+    diagnostic["replay_likelihood"] = replay_res.replay_likelihood
+    diagnostic["replay_status"] = replay_res.status
 
     # 6. Speaker Verification (if claimed speaker identity is set)
     speaker_res = SpeakerVerificationResult(
@@ -271,20 +441,51 @@ async def analyze_audio_upload(
             # Cosine similarity
             sim = speaker_verification_adapter.verify_similarity(enrolled_embedding, current_embedding)
             
-            # Threshold: >= 0.55 similarity is MATCH
-            match_status = "MATCH" if sim >= 0.55 else "MISMATCH"
+            emb_hash = hashlib.sha256(json.dumps(current_embedding).encode()).hexdigest()[:16]
+            ref_hash = hashlib.sha256(speaker.embeddings[0].embedding_json.encode()).hexdigest()[:16]
+            diagnostic["embedding_hash"] = emb_hash
+            diagnostic["reference_embedding_hash"] = ref_hash
+            diagnostic["speaker_similarity"] = round(sim, 4)
+            logger.info(
+                f"Speaker biometric verification: call={call_id} speaker={call.claimed_identity} "
+                f"sim={sim:.4f} cur_emb_hash={emb_hash} ref_emb_hash={ref_hash}"
+            )
+
+            # Calibrated Threshold from Phase 1E empirical sweep
+            spk_thresh = getattr(settings, "SPEAKER_VERIFICATION_THRESHOLD", 0.880)
+            match_status = "MATCH" if sim >= spk_thresh else "MISMATCH"
+            conf_level = "HIGH" if sim >= 0.92 else ("MEDIUM" if sim >= spk_thresh else "LOW")
+            
             speaker_res = SpeakerVerificationResult(
                 status=match_status,
                 similarity=round(sim, 4),
                 confidence=round(abs(sim), 4),
+                confidence_level=conf_level,
                 claimed_speaker_id=call.claimed_identity,
+                reference_id=call.claimed_identity,
+                model={
+                    "name": "SpeakerVerification-AcousticEmbed",
+                    "version": speaker_verification_adapter.model_version,
+                    "type": "Handcrafted 128-D Acoustic Vector",
+                },
+                input_audio_hash=audio_sha256,
+                reference_embedding_hash=ref_hash,
             )
         else:
             speaker_res = SpeakerVerificationResult(
                 status="NO_ENROLLMENT_FOUND",
                 similarity=None,
                 confidence=0.0,
+                confidence_level="N/A",
                 claimed_speaker_id=call.claimed_identity,
+                reference_id=None,
+                model={
+                    "name": "SpeakerVerification-AcousticEmbed",
+                    "version": speaker_verification_adapter.model_version,
+                    "type": "Handcrafted 128-D Acoustic Vector",
+                },
+                input_audio_hash=audio_sha256,
+                reference_embedding_hash=None,
             )
 
     # 7. Behavioral & Prosodic Risk
@@ -412,6 +613,9 @@ async def analyze_audio_upload(
         "speaker_verification": speaker_res.model_dump(),
         "behavioral_risk_score": behavioral_score,
         "features": acoustic_features.model_dump(),
+        "diagnostic": diagnostic,
+        "quality_report": quality_report.to_dict(),
+        "replay_analysis": replay_res.to_dict(),
         "risk_assessment": {
             "overall_risk_score": overall_score,
             "risk_level": risk_level,

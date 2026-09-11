@@ -342,14 +342,24 @@ export const LiveProtection: React.FC<LiveProtectionProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
                   <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800 space-y-1">
-                    <span className="text-slate-400 text-[10px] uppercase block">VOICE EMBEDDING SIMILARITY</span>
-                    <div className="text-lg font-bold text-slate-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 text-[10px] uppercase block">SPEAKER SIMILARITY</span>
+                      {callDetail?.latest_analysis?.speaker_similarity !== undefined && callDetail?.latest_analysis?.speaker_similarity !== null && (
+                        <span className={`text-[10px] font-bold ${callDetail.latest_analysis.speaker_similarity >= 0.88 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                          {callDetail.latest_analysis.speaker_similarity >= 0.88 ? 'MATCH' : 'MISMATCH'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-lg font-bold text-slate-200 flex items-baseline gap-1.5">
                       {callDetail?.latest_analysis?.speaker_similarity !== undefined && callDetail?.latest_analysis?.speaker_similarity !== null
-                        ? `${(callDetail.latest_analysis.speaker_similarity * 100).toFixed(1)}%`
-                        : 'PENDING ENROLLMENT MATCH'}
+                        ? `${callDetail.latest_analysis.speaker_similarity.toFixed(3)}`
+                        : 'PENDING ENROLLMENT'}
+                      {callDetail?.latest_analysis?.speaker_similarity !== undefined && callDetail?.latest_analysis?.speaker_similarity !== null && (
+                        <span className="text-xs text-slate-500 font-normal">cosine</span>
+                      )}
                     </div>
                     <p className="text-[10px] text-slate-500">
-                      Cosine distance against claimed identity reference vector (ECAPA-TDNN)
+                      Cosine similarity against reference vector (128-D Vector, Threshold: 0.880 · Similarity ≠ Probability)
                     </p>
                   </div>
 
@@ -361,7 +371,7 @@ export const LiveProtection: React.FC<LiveProtectionProps> = ({
                         : callDetail?.latest_analysis?.anti_spoof_status || 'MODEL_NOT_CONFIGURED'}
                     </div>
                     <p className="text-[10px] text-slate-500">
-                      Acoustic artifact and synthetic phase analysis (WavLM-Linear)
+                      Acoustic artifact and synthetic phase analysis (AASIST SincNet Graph Network)
                     </p>
                   </div>
                 </div>

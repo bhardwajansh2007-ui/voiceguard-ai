@@ -46,7 +46,7 @@ class SpeakerVerificationAdapter(BaseSpeakerVerificationModel):
                 self.model = torch.load(self.model_path, map_location=self.device)
                 self.model.eval()
                 self.is_custom_model_loaded = True
-                self.model_version = "ECAPA-TDNN-Custom"
+                self.model_version = "CustomSpeakerModel"
                 logger.info(f"Custom speaker verification checkpoint loaded from {self.model_path}")
             except Exception as e:
                 logger.error(f"Failed loading custom speaker model: {str(e)}")
@@ -137,10 +137,13 @@ class SpeakerVerificationAdapter(BaseSpeakerVerificationModel):
         return {
             "model_name": "SpeakerVerification-AcousticEmbed",
             "model_version": self.model_version,
+            "architecture": "Multi-Frame DCT Filterbank & Temporal Prosodic Feature Vector",
+            "model_type": "Acoustic Prosodic Extractor (Handcrafted 128-D Vector, Non-Neural)",
             "status": "OPERATIONAL",
             "vector_dim": self.VECTOR_DIM,
             "is_custom_checkpoint": self.is_custom_model_loaded,
-            "device": self.device,
+            "device": "cpu",
+            "similarity_metric": "Cosine Similarity",
             "last_latency_ms": round(self.last_latency_ms, 2) if self.last_latency_ms else None,
         }
 

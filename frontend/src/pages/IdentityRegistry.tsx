@@ -183,7 +183,7 @@ export const IdentityRegistry: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Zero-Trust identity verification directory. Maps executive credentials, trusted phone identifiers, ECAPA-TDNN unit acoustic vectors, and allowed operations.
+            Zero-Trust identity verification directory. Maps executive credentials, trusted phone identifiers, 128-D acoustic-prosodic biometric vectors, and allowed operations.
           </p>
         </div>
 

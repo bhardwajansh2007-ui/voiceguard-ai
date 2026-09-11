@@ -88,7 +88,7 @@ app.include_router(integration.router, prefix=settings.API_V1_PREFIX)
 app.include_router(audio_stream.router)
 
 
-@app.get("/")
+@app.get("/api/info")
 def root_status():
     return {
         "service": settings.APP_NAME,
@@ -99,3 +99,38 @@ def root_status():
         "status": "OPERATIONAL",
         "api_docs": "/docs",
     }
+
+
+# Static Frontend & Single-Service SPA Routing (Production & Render)
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+frontend_dist = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend", "dist")
+)
+
+if os.path.isdir(frontend_dist) and os.path.isfile(os.path.join(frontend_dist, "index.html")):
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="static-assets")
+
+    # Static samples (e.g. /samples/legitimate_sample.wav)
+    samples_dir = os.path.join(frontend_dist, "samples")
+    if os.path.isdir(samples_dir):
+        app.mount("/samples", StaticFiles(directory=samples_dir), name="static-samples")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # Allow API, docs, redoc, openapi, and websockets to be handled by routers
+        if full_path.startswith(("api/", "api", "docs", "redoc", "openapi.json", "ws")):
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+        file_path = os.path.join(frontend_dist, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
+else:
+    @app.get("/")
+    def fallback_root():
+        return root_status()
+

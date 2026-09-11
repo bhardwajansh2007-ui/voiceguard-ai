@@ -34,6 +34,8 @@ class AntiSpoofAdapter(BaseAntiSpoofModel):
         self.model_version = "AASIST-v2.1"
         self.is_loaded = False
         self.model = None
+        self.checkpoint_sha256: Optional[str] = None
+        self.parameter_count: int = 0
         self.last_inference_latency_ms: Optional[float] = None
         self.load_model()
 
@@ -58,8 +60,12 @@ class AntiSpoofAdapter(BaseAntiSpoofModel):
             import torch
             from backend.app.services.ml.anti_spoof.aasist_model import Model
 
+            import hashlib
+            with open(ckpt_path, "rb") as f:
+                self.checkpoint_sha256 = hashlib.sha256(f.read()).hexdigest()
+
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
-            logger.info(f"Loading AASIST neural architecture on {self.device} from {ckpt_path}...")
+            logger.info(f"Loading AASIST neural architecture on {self.device} from {ckpt_path} (SHA-256: {self.checkpoint_sha256[:16]}...)...")
 
             self.model = Model(AASIST_CONFIG)
             state_dict = torch.load(ckpt_path, map_location=self.device)
@@ -68,9 +74,10 @@ class AntiSpoofAdapter(BaseAntiSpoofModel):
             self.model.load_state_dict(state_dict, strict=False)
             self.model.to(self.device)
             self.model.eval()
+            self.parameter_count = sum(p.numel() for p in self.model.parameters())
             self.is_loaded = True
             self.model_path = ckpt_path
-            logger.info(f"AASIST anti-spoof model successfully loaded on {self.device}.")
+            logger.info(f"AASIST anti-spoof model successfully loaded on {self.device} ({self.parameter_count} parameters).")
             return True
         except Exception as e:
             logger.error(f"Failed to load anti-spoof checkpoint: {str(e)}")
@@ -95,11 +102,31 @@ class AntiSpoofAdapter(BaseAntiSpoofModel):
         try:
             import torch
 
-            # 1. Normalize audio to float32
+            # 1. Check for pure silence or non-speech zeros
+            if len(audio) == 0 or np.max(np.abs(audio)) < 1e-4:
+                return AntiSpoofResult(
+                    status="SILENCE",
+                    spoof_probability=None,
+                    genuine_probability=None,
+                    confidence=0.0,
+                    model_version=self.model_version,
+                )
+
+            # 2. Check for insufficient audio duration (minimum 1.0s / 16,000 samples required for graph topology)
+            if len(audio) < 16000:
+                return AntiSpoofResult(
+                    status="INSUFFICIENT_AUDIO",
+                    spoof_probability=None,
+                    genuine_probability=None,
+                    confidence=0.0,
+                    model_version=self.model_version,
+                )
+
+            # 3. Normalize audio to float32
             if audio.dtype != np.float32:
                 audio = audio.astype(np.float32)
 
-            # 2. AASIST input requires 64600 samples (~4.03 seconds at 16kHz)
+            # 4. AASIST input requires 64600 samples (~4.03 seconds at 16kHz)
             target_len = 64600
             if len(audio) < target_len:
                 repeats = int(np.ceil(target_len / max(len(audio), 1)))
@@ -150,10 +177,15 @@ class AntiSpoofAdapter(BaseAntiSpoofModel):
         return {
             "model_name": "VoiceAntiSpoof-AASIST",
             "model_version": self.model_version,
+            "architecture": "AASIST (Graph Attention Network with SincNet frontend)",
             "status": "LOADED" if self.is_loaded else "MODEL_NOT_CONFIGURED",
             "is_loaded": self.is_loaded,
             "device": self.device,
             "configured_path": self.model_path or "None",
+            "checkpoint_sha256": self.checkpoint_sha256,
+            "parameter_count": self.parameter_count,
+            "scoring_method": "ASVspoof log-likelihood ratio (bonafide - spoof)",
+            "calibration_status": "Empirical Logistic Score (Heuristic, Non-Calibrated)",
             "last_latency_ms": round(self.last_inference_latency_ms, 2) if self.last_inference_latency_ms else None,
         }
 

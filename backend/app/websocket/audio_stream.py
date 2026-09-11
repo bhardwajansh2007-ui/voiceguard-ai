@@ -242,6 +242,19 @@ async def audio_stream_websocket(websocket: WebSocket, call_id: str):
                             # 2. Extract Acoustic Features
                             features = extractor.extract_features(window_audio, vad_speech_ratio=speech_ratio)
 
+                            # Compute Forensic Audio Integrity Hash for Streaming Chunk
+                            import hashlib
+                            chunk_hash = hashlib.sha256(window_audio.tobytes()).hexdigest()
+                            diagnostic = {
+                                "audio_sha256": chunk_hash,
+                                "duration_seconds": settings.STREAM_WINDOW_SIZE_SECONDS,
+                                "sample_rate": sample_rate,
+                                "sample_count": len(window_audio),
+                                "vad_speech_ratio": round(speech_ratio, 3),
+                                "inference_device": anti_spoof_adapter.device,
+                                "inference_timestamp": datetime.now(timezone.utc).isoformat(),
+                            }
+
                             # 3. Anti-Spoof ML Inference
                             anti_spoof_res = anti_spoof_adapter.predict(window_audio)
 
@@ -249,12 +262,27 @@ async def audio_stream_websocket(websocket: WebSocket, call_id: str):
                             if enrolled_embedding is not None:
                                 curr_emb = speaker_verification_adapter.compute_embedding(window_audio)
                                 sim = speaker_verification_adapter.verify_similarity(enrolled_embedding, curr_emb)
-                                sp_status = "MATCH" if sim >= 0.55 else "MISMATCH"
+                                emb_hash = hashlib.sha256(json.dumps(curr_emb).encode()).hexdigest()[:16]
+                                ref_hash = hashlib.sha256(json.dumps(enrolled_embedding).encode()).hexdigest()[:16]
+                                diagnostic["embedding_hash"] = emb_hash
+                                diagnostic["reference_embedding_hash"] = ref_hash
+                                spk_thresh = getattr(settings, "SPEAKER_VERIFICATION_THRESHOLD", 0.880)
+                                sp_status = "MATCH" if sim >= spk_thresh else "MISMATCH"
+                                conf_level = "HIGH" if sim >= 0.92 else ("MEDIUM" if sim >= spk_thresh else "LOW")
                                 speaker_res = SpeakerVerificationResult(
                                     status=sp_status,
                                     similarity=round(sim, 4),
                                     confidence=round(abs(sim), 4),
+                                    confidence_level=conf_level,
                                     claimed_speaker_id=call.claimed_identity,
+                                    reference_id=call.claimed_identity,
+                                    model={
+                                        "name": "SpeakerVerification-AcousticEmbed",
+                                        "version": speaker_verification_adapter.model_version,
+                                        "type": "Handcrafted 128-D Acoustic Vector",
+                                    },
+                                    input_audio_hash=chunk_hash,
+                                    reference_embedding_hash=ref_hash,
                                 )
                             elif call.claimed_identity:
                                 speaker_res = SpeakerVerificationResult(
@@ -335,6 +363,7 @@ async def audio_stream_websocket(websocket: WebSocket, call_id: str):
                                     "decision_reason": reason,
                                     "contributing_factors": all_factors,
                                     "signals": signals,
+                                    "diagnostic": diagnostic,
                                     "timestamp": datetime.now(timezone.utc).isoformat(),
                                 },
                             )

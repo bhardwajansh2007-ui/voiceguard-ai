@@ -1,0 +1,27 @@
+﻿# =========================================================
+# Render Blueprint Specification for VoiceGuard AI
+# Docs: https://render.com/docs/blueprint-spec
+# =========================================================
+services:
+  - type: web
+    name: voiceguard-ai
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEPLOYMENT_MODE
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: DEVICE
+        value: cpu
+      - key: ANTI_SPOOF_MODEL_PATH
+        value: backend/app/services/ml/anti_spoof/checkpoints/AASIST.pth
+      - key: SPEAKER_VERIFICATION_THRESHOLD
+        value: "0.880"
