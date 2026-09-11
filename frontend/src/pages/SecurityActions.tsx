@@ -40,8 +40,8 @@ export const SecurityActions: React.FC = () => {
   // Protected Action Simulator state
   const [simActionType, setSimActionType] = useState('HIGH_VALUE_WIRE_TRANSFER');
   const [simAmount, setSimAmount] = useState('2500000');
-  const [simIdentity, setSimIdentity] = useState('Rahul Sharma (Finance Director)');
-  const [simCallerId, setSimCallerId] = useState('+91 98765 43210');
+  const [simIdentity, setSimIdentity] = useState('Aarav Mehta (Finance Operations)');
+  const [simCallerId, setSimCallerId] = useState('+91 98000 12345');
   const [simRiskScore, setSimRiskScore] = useState(88);
   const [simLoading, setSimLoading] = useState(false);
   const [simResult, setSimResult] = useState<ProtectedActionSimulationResult | null>(null);

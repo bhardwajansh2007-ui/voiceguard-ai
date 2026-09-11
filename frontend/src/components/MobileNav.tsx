@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Smartphone,
   LayoutDashboard,
   Activity,
   Terminal,
@@ -35,13 +36,14 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const mainTabs = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'protected-phone', label: 'Protected Phone', icon: Smartphone, dot: true },
     { id: 'caller-intelligence', label: 'Caller Intel', icon: PhoneCall },
-    { id: 'live-protection', label: 'Live Defense', icon: Activity, dot: true },
-    { id: 'protected-calls', label: 'Protected Calls', icon: Terminal },
+    { id: 'live-protection', label: 'Live Signal', icon: Activity },
+    { id: 'overview', label: 'Control Center', icon: LayoutDashboard },
   ];
 
   const drawerItems = [
+    { id: 'protected-calls', label: 'Protected Calls', icon: Terminal },
     { id: 'identity-registry', label: 'Identity Registry', icon: Users },
     { id: 'risk-center', label: 'Risk Center', icon: Search },
     { id: 'security-actions', label: 'Security Actions', icon: ShieldAlert },

@@ -34,7 +34,7 @@ export const CallerIntelligence: React.FC<CallerIntelligenceProps> = ({
   onNavigateToSecurityActions,
   onNavigateToActions,
 }) => {
-  const [query, setQuery] = useState('EMP-9021');
+  const [query, setQuery] = useState('EMP-DEMO-001');
   const [dossier, setDossier] = useState<CallerIntelligenceDossier | null>(null);
   const [recentDossiers, setRecentDossiers] = useState<CallerIntelligenceDossier[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,7 +65,7 @@ export const CallerIntelligence: React.FC<CallerIntelligenceProps> = ({
   };
 
   useEffect(() => {
-    fetchDossier('EMP-9021');
+    fetchDossier('EMP-DEMO-001');
     fetchRecent();
   }, []);
 

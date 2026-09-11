@@ -191,8 +191,8 @@ export const ProtectedCalls: React.FC<ProtectedCallsProps> = ({
           action_type: 'QUARTERLY_BUDGET_APPROVAL',
           action_sensitivity: 'MEDIUM' as const,
           transaction_amount: 250000,
-          claimed_identity: 'Rahul Sharma (Finance Director)',
-          caller_id: '+91 98765 43210',
+          claimed_identity: 'Aarav Mehta (Finance Operations)',
+          caller_id: '+91 98000 12345',
           authentication_state: 'AUTHENTICATED',
         };
       } else if (scenario === 'CLONED') {
@@ -202,8 +202,8 @@ export const ProtectedCalls: React.FC<ProtectedCallsProps> = ({
           action_type: 'EMERGENCY_WIRE_TRANSFER',
           action_sensitivity: 'CRITICAL' as const,
           transaction_amount: 2500000,
-          claimed_identity: 'Rahul Sharma (Finance Director)',
-          caller_id: '+91 98765 43210',
+          claimed_identity: 'Aarav Mehta (Finance Operations)',
+          caller_id: '+91 98000 12345',
           authentication_state: 'VOICE_CHALLENGE_ACTIVE',
         };
       } else {
@@ -352,7 +352,7 @@ export const ProtectedCalls: React.FC<ProtectedCallsProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-1">
-                Known enrolled executive <strong>Rahul Sharma</strong> requesting ₹2,50,000 budget approval. Authentic voice matching reference embeddings.
+                Known enrolled executive <strong>Aarav Mehta</strong> requesting ₹2,50,000 budget approval. Authentic voice matching reference embeddings.
               </p>
             </div>
             <button
@@ -378,7 +378,7 @@ export const ProtectedCalls: React.FC<ProtectedCallsProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-1">
-                Cloned synthetic voice claiming to be <strong>Rahul Sharma</strong> urgently demanding ₹25,00,000 offshore wire. Anti-spoof triggers automated hold.
+                Cloned synthetic voice claiming to be <strong>Aarav Mehta</strong> urgently demanding ₹25,00,000 offshore wire. Anti-spoof triggers automated hold.
               </p>
             </div>
             <button
@@ -761,7 +761,7 @@ export const ProtectedCalls: React.FC<ProtectedCallsProps> = ({
                   value={newCallIdentity}
                   onChange={(e) => setNewCallIdentity(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded text-slate-200"
-                  placeholder="e.g. Rahul Sharma (Finance Director)"
+                  placeholder="e.g. Aarav Mehta (Finance Operations)"
                 />
               </div>
             </div>

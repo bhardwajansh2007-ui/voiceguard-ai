@@ -15,16 +15,16 @@ def test_list_identities(auth_headers):
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
-    # Rahul Sharma reference profile should be present from init_db
+    # Aarav Mehta reference profile should be present from init_db
     handles = [item["speaker_id"] for item in data]
-    assert "EMP-9021" in handles
+    assert "EMP-DEMO-001" in handles
 
 def test_caller_intelligence_lookup(auth_headers):
-    response = client.get("/api/v1/caller-intelligence/lookup?query=EMP-9021", headers=auth_headers)
+    response = client.get("/api/v1/caller-intelligence/lookup?query=EMP-DEMO-001", headers=auth_headers)
     assert response.status_code == 200
     dossier = response.json()
-    assert dossier["caller_name"] == "Rahul Sharma"
-    assert dossier["organization"] == "ABC Bank"
+    assert dossier["caller_name"] == "Aarav Mehta"
+    assert dossier["organization"] == "DemoBank Secure"
     assert dossier["identity_status"] == "VERIFIED"
     assert "recommended_decision" in dossier
     assert "overall_risk_level" in dossier
@@ -32,8 +32,8 @@ def test_caller_intelligence_lookup(auth_headers):
 def test_simulate_sensitive_action(auth_headers):
     # Create a call session first
     create_res = client.post("/api/v1/calls", json={
-        "caller_id": "+91 98765 43210",
-        "claimed_identity": "EMP-9021",
+        "caller_id": "+91 98000 12345",
+        "claimed_identity": "EMP-DEMO-001",
         "action_type": "FINANCIAL_ACTION",
         "action_sensitivity": "HIGH",
         "transaction_amount": 2500000.0,

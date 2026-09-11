@@ -1,14 +1,24 @@
 import React from 'react';
-import { Shield, Radio, LogOut, User, Cpu } from 'lucide-react';
+import { Shield, Radio, LogOut, User, Cpu, Smartphone, LayoutDashboard } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface NavbarProps {
   user: UserType | null;
   onLogout: () => void;
   activeCallsCount?: number;
+  currentTab?: string;
+  onSelectTab?: (tab: string) => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, activeCallsCount = 0 }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  user,
+  onLogout,
+  activeCallsCount = 0,
+  currentTab = 'protected-phone',
+  onSelectTab,
+}) => {
+  const isPhoneMode = currentTab === 'protected-phone';
+
   return (
     <header className="h-14 md:h-16 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md px-3 md:px-6 flex items-center justify-between sticky top-0 z-40">
       {/* Brand Title */}
@@ -28,16 +38,46 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, activeCallsCount
         </div>
       </div>
 
+      {/* Experience Switcher (Phone vs Security Control Center) */}
+      {onSelectTab && (
+        <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs font-mono">
+          <button
+            onClick={() => onSelectTab('protected-phone')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              isPhoneMode
+                ? 'bg-cyan-500 text-slate-950 font-bold shadow-md shadow-cyan-500/20'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Smartphone className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Protected Phone</span>
+            <span className="sm:hidden">Phone</span>
+          </button>
+          <button
+            onClick={() => onSelectTab(isPhoneMode ? 'overview' : currentTab)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              !isPhoneMode
+                ? 'bg-cyan-500 text-slate-950 font-bold shadow-md shadow-cyan-500/20'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Control Center</span>
+            <span className="sm:hidden">Center</span>
+          </button>
+        </div>
+      )}
+
       {/* Center Status Indicators */}
-      <div className="hidden md:flex items-center gap-4 text-xs font-mono">
+      <div className="hidden lg:flex items-center gap-3 text-xs font-mono">
         <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300">
           <Radio className={`w-3.5 h-3.5 ${activeCallsCount > 0 ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
-          <span>Active Sessions: <strong>{activeCallsCount}</strong></span>
+          <span>Active: <strong>{activeCallsCount}</strong></span>
         </div>
 
         <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300">
           <Cpu className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Mode: <strong className="text-cyan-300">Safe Deployment</strong></span>
+          <span>Enclave: <strong className="text-cyan-300">Active</strong></span>
         </div>
       </div>
 

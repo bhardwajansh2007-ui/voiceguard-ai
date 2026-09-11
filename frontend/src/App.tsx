@@ -17,6 +17,7 @@ import { ModelStatus } from './pages/ModelStatus';
 import { SystemHealth } from './pages/SystemHealth';
 import { Settings } from './pages/Settings';
 import { RemoteCallerTerminal } from './pages/RemoteCallerTerminal';
+import { ProtectedPhone } from './pages/ProtectedPhone';
 import { MobileNav } from './components/MobileNav';
 import { InstallAppPrompt } from './components/InstallAppPrompt';
 
@@ -24,7 +25,7 @@ export function App() {
   const isCallerMode = new URLSearchParams(window.location.search).get('mode') === 'caller';
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
-  const [currentTab, setCurrentTab] = useState<string>('overview');
+  const [currentTab, setCurrentTab] = useState<string>('protected-phone');
   const [targetCallId, setTargetCallId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -75,13 +76,26 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col">
-      <Navbar user={currentUser} onLogout={handleLogout} />
+      <Navbar
+        user={currentUser}
+        onLogout={handleLogout}
+        currentTab={currentTab}
+        onSelectTab={setCurrentTab}
+      />
 
       <div className="flex-1 flex overflow-hidden">
         <Sidebar currentTab={currentTab} onSelectTab={setCurrentTab} />
 
         <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 pb-24 md:pb-6 bg-grid-pattern">
           <div className="max-w-7xl mx-auto">
+            {/* Primary Phone Experience: Protected Phone */}
+            {currentTab === 'protected-phone' && (
+              <ProtectedPhone
+                onNavigateToAuditLedger={() => setCurrentTab('audit-ledger')}
+                onNavigateToControlCenter={(tab) => setCurrentTab(tab || 'overview')}
+              />
+            )}
+
             {/* 1. Overview */}
             {currentTab === 'overview' && (
               <SecurityOverview

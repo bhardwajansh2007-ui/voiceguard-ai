@@ -95,21 +95,33 @@ def init_database() -> None:
             )
             db.add(admin_user)
 
-        # 3. Initialize Fictional Reference Identity (Controlled SIH Cybersecurity Demonstration)
+        # 3. Initialize Controlled Fictional Reference Identity (SIH 2026 Demonstration)
         from backend.app.models.database_models import Speaker, SpeakerEmbedding
         from datetime import datetime, timezone
 
-        ref_speaker = db.query(Speaker).filter(Speaker.speaker_id == "EMP-9021").first()
+        # Migrate existing EMP-9021 to EMP-DEMO-001 if present
+        old_speaker = db.query(Speaker).filter(Speaker.speaker_id == "EMP-9021").first()
+        if old_speaker:
+            old_speaker.speaker_id = "EMP-DEMO-001"
+            old_speaker.display_name = "Aarav Mehta"
+            old_speaker.organization = "DemoBank Secure"
+            old_speaker.department = "Finance Operations"
+            old_speaker.role_title = "Finance Operations Lead"
+            old_speaker.caller_id = "+91 98000 12345"
+            old_speaker.notes = "Controlled fictional identity for SIH 2026 voice security demonstration. Zero real customer data."
+            db.commit()
+
+        ref_speaker = db.query(Speaker).filter(Speaker.speaker_id == "EMP-DEMO-001").first()
         if not ref_speaker:
-            logger.info("Seeding compliant fictional reference identity (Rahul Sharma, Finance Director, ABC Bank)...")
+            logger.info("Seeding compliant fictional reference identity (Aarav Mehta, DemoBank Secure, EMP-DEMO-001)...")
             now = datetime.now(timezone.utc)
             fictional_identity = Speaker(
-                speaker_id="EMP-9021",
-                display_name="Rahul Sharma",
-                organization="ABC Bank",
+                speaker_id="EMP-DEMO-001",
+                display_name="Aarav Mehta",
+                organization="DemoBank Secure",
                 department="Finance Operations",
-                role_title="Finance Director",
-                caller_id="+91 98765 43210",
+                role_title="Finance Operations Lead",
+                caller_id="+91 98000 12345",
                 identity_status="VERIFIED",
                 mfa_enabled=True,
                 sensitive_actions_enabled=True,
@@ -119,7 +131,7 @@ def init_database() -> None:
                     "Financial instruction",
                     "Administrative approval",
                 ]),
-                notes="Controlled fictional executive profile for SIH 2026 demonstration. Zero real customer/banking data.",
+                notes="Controlled fictional identity for SIH 2026 voice security demonstration. Zero real customer data.",
                 consent_recorded=True,
                 consent_timestamp=now,
                 model_version="v1.0.0",

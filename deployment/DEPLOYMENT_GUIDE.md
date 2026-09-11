@@ -57,7 +57,7 @@ Both your PC and phone must be on the **same Wi-Fi network**.
 - File: `voiceguard.db` in project root.
 - Zero setup needed. Pre-configured with:
   - Administrator account (`admin` / `VoiceGuardAdmin2026!`).
-  - Reference identity: `Rahul Sharma, Finance Director, ABC Bank` (`EMP-9021`, `+91 98765 43210`).
+  - Reference identity: `Aarav Mehta, Finance Operations, DemoBank Secure` (`EMP-DEMO-001`, `+91 98000 12345`).
   - Initialized schema for calls, biometric embeddings, risk assessments, decisions, and audit ledger.
 
 ### 2. Switching to Cloud PostgreSQL (Free on Neon / Supabase / Render)
